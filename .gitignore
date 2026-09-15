@@ -1,0 +1,24 @@
+**/bin/
+**/obj/
+.build/
+dist/
+.vs/
+*.user
+*.suo
+*.dll
+*.exe
+*.pdb
+*.dmp
+*.log
+*.zip
+# No local game files, captures, settings, accounts or generated hooks.
+Managed/
+game-client/
+diagnostics/
+connection.json
+control.json
+runtime.json
+latest.json
+settings.json
+compatibility.json
+!compatibility/contract.json

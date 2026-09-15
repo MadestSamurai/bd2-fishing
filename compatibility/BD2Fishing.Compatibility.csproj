@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><TargetFramework>net8.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+<ItemGroup>
+<PackageReference Include="Mono.Cecil" Version="0.11.6" />
+<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+<PackageReference Include="Lib.Harmony" Version="2.4.2" GeneratePathProperty="true" PrivateAssets="all" ExcludeAssets="compile;runtime" />
+<EmbeddedResource Include="$(PkgLib_Harmony)/lib/net472/0Harmony.dll" LogicalName="BD2Fishing.Harmony.dll" />
+<EmbeddedResource Include="../hook/*.cs" LogicalName="Hook.%(Filename)%(Extension)" />
+<EmbeddedResource Include="../shared/*.cs" LogicalName="Hook.%(Filename)%(Extension)" />
+<EmbeddedResource Include="contract.json" Condition="Exists('contract.json')" LogicalName="BD2Fishing.Contract.json" />
+</ItemGroup>
+</Project>
