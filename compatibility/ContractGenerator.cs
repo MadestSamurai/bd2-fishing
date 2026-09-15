@@ -44,6 +44,10 @@ public static class ContractGenerator
         Role("Inventory",inventory);Role("SaleItem","ὥὣὮὨὫὣὩὨὪὣὭ");Role("ItemType","ὪὡὢὦὢὡὯὩὫὤὥ");Role("FishGrade","ὥὡὯὭὫὨὯὧὡὯὤ/ὠὯὯὮὯὧὩὪὡὫὧ");
         Select(roles["SaleItem"],".ctor",4);
         foreach(var property in new[]{"ὢὯὧὤὮὭὮὣὭὪὣ","ὠὬὩὥὥὨὠὭὩὬὬ","ὬὯὭὩὡὮὩὨὢὭὣ","ὬὯὫὯὮὠὡὪὤὣὬ"})Select(roles["SaleItem"],property);
+        Api("Clock.Instance","ὧὥὢὯὯὣὩὧὡὠὨ","ὤὬὯὣὡὭὪὤὥὧὧ");
+        Api("Clock.Now","gamfs.Thread.TimerManager","Now",0);
+        Api("Tables.Default",tables,"ὬὥὠὭὬὢὦὯὤὮὢ");
+        Api("Inventory.MapUnlocked",inventory,"ὮὦὩὫὭὧὨὯὠὫὣ",1);
         Api("Tables.CastGrade",tables,"ὪὬὠὬὮὮὬὠὮὢὨ",2);
         Api("Tables.Shop",tables,"ὤὠὡὭὩὥὥὥὦὨὧ",1);Api("Tables.ShopEntries",tables,"ὧὮὮὤὠὨὩὣὢὪὦ",1);
         Api("Tables.Fish",tables,"ὦὮὩὣὥὡὨὪὤὠὤ",1);Api("Tables.Bait",tables,"ὠὫὯὬὡὮὦὣὨὧὭ",1);Api("Tables.Buff",tables,"ὣὪὯὧὦὮὡὥὣὫὬ",1);

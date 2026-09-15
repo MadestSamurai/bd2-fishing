@@ -25,6 +25,7 @@ namespace BD2Fishing.Runtime
         private volatile FishingControl control=new FishingControl();
         private volatile FishingSnapshot latest=new FishingSnapshot();
         private FishingGameFieldDefaultUI ui;private UIBase popup;private FishingSkillHoldItem ownedHold;
+        private object mapManager;
         private UIBase[] surfaces=new UIBase[0];private long lastScan,lastStatus;private string observedOwner="",lastAction="";
         private string lastUiLayers="",lastMapTransition="";
         private long actionCount;private double previousX;private float previousTime;private int previousNeedle;
@@ -86,6 +87,7 @@ namespace BD2Fishing.Runtime
                 var action=policy.Next(s,c,now,holdPhase);
                 if(action!=FishingAction.None)Apply(action,s);
                 s.Enabled=c.Valid(now,pid) && policy.Fault.Length==0;
+                if(holdPhase){s.MapRenewalStatus=policy.MapRenewalStatus;s.MapRenewals=policy.MapRenewals;}
                 s.OwnerId=c.OwnerId;s.Reason=policy.Reason;s.LastAction=lastAction;s.ActionCount=actionCount;
                 if(s.Enabled && s.MapChangePending && !s.Busy && s.State!="None")s.Reason+="；昼夜切换排队，先完成本竿";
                 if(policy.Fault.Length>0)s.Error=policy.Fault;
@@ -101,6 +103,17 @@ namespace BD2Fishing.Runtime
         private FishingSnapshot Read(long now)
         {
             var s=new FishingSnapshot{ProcessId=pid,CapturedUtcTicks=now,Scene=SceneManager.GetActiveScene().name};
+            var activePopups=surfaces.Where(v=>FishingBindings.Active(v) && FishingBindings.Flag(v,"ὡὡὡὯὬὨὢὧὦὦὫ")).ToArray();
+            var open=activePopups.Where(FishingPopupClassifier.IsBlockingPopup).OrderByDescending(v=>FishingBindings.Num(v,"ὤὩὪὬὬὤὪὮὣὩὩ")).ToArray();
+            s.UiLayers=string.Join("; ",activePopups.Select(v=>v.GetType().Name+"["+FishingBindings.Get(v,"ὧὨὦὯὣὣὡὣὪὮὨ")+"]="+(FishingPopupClassifier.IsBlockingPopup(v)?"popup":"hud")).OrderBy(v=>v));
+            if(s.UiLayers!=lastUiLayers){lastUiLayers=s.UiLayers;if(diagnostics.Count<256)diagnostics.Enqueue("ui_layers "+lastUiLayers);}
+            popup=open.FirstOrDefault(v=>v is AvatarFishingGetPopupUI || v is AvatarFishingLevelUpPopupUI);
+            s.ResultPopup=popup is AvatarFishingGetPopupUI;s.LevelPopup=popup is AvatarFishingLevelUpPopupUI;
+            if(popup!=null){s.CanClosePopup=popup.CanCloseUI();s.PopupId=popup.GetInstanceID();}
+            var other=open.FirstOrDefault(v=>v!=popup);
+            if(other!=null)s.BlockReason="等待关闭游戏弹窗："+other.GetType().Name;
+            if(FishingBindings.Active(ui))mapManager=FishingBindings.Get(ui,"ὢὨὠὩὤὬὠὧὬὠὬ");
+            FishingMap.Read(mapManager,s);
             if(!FishingBindings.Active(ui))return s;
             var manager=FishingBindings.Get(ui,"ὢὨὠὩὤὬὠὧὬὠὬ");
             var model=FishingBindings.Get(manager,"ὧὠὤὦὠὡὠὪὪὢὠ");
@@ -114,15 +127,6 @@ namespace BD2Fishing.Runtime
             s.CanCast=FishingBindings.Flag(charger,"ὩὯὪὩὯὫὮὤὭὧὢ");s.CastRunning=FishingBindings.Flag(charger,"ὩὡὣὢὬὦὥὧὥὭὦ");
             s.BagFull=(bool)FishingBindings.Call(ui,"ὬὣὦὫὬὯὧὮὣὣὡ");s.Gauge=charger.GetNormalizeValue();
             s.CastGrade=Convert.ToInt32(FishingBindings.Invoke("Tables.CastGrade",(float)s.Gauge,0));
-            var activePopups=surfaces.Where(v=>FishingBindings.Active(v) && FishingBindings.Flag(v,"ὡὡὡὯὬὨὢὧὦὦὫ")).ToArray();
-            var open=activePopups.Where(FishingPopupClassifier.IsBlockingPopup).OrderByDescending(v=>FishingBindings.Num(v,"ὤὩὪὬὬὤὪὮὣὩὩ")).ToArray();
-            s.UiLayers=string.Join("; ",activePopups.Select(v=>v.GetType().Name+"["+FishingBindings.Get(v,"ὧὨὦὯὣὣὡὣὪὮὨ")+"]="+(FishingPopupClassifier.IsBlockingPopup(v)?"popup":"hud")).OrderBy(v=>v));
-            if(s.UiLayers!=lastUiLayers){lastUiLayers=s.UiLayers;if(diagnostics.Count<256)diagnostics.Enqueue("ui_layers "+lastUiLayers);}
-            popup=open.FirstOrDefault(v=>v is AvatarFishingGetPopupUI || v is AvatarFishingLevelUpPopupUI);
-            s.ResultPopup=popup is AvatarFishingGetPopupUI;s.LevelPopup=popup is AvatarFishingLevelUpPopupUI;
-            if(popup!=null){s.CanClosePopup=popup.CanCloseUI();s.PopupId=popup.GetInstanceID();}
-            var other=open.FirstOrDefault(v=>v!=popup);
-            if(other!=null)s.BlockReason="等待关闭游戏弹窗："+other.GetType().Name;
             if(s.State!="Fighting")return s;
             s.FishId=(int)FishingBindings.Num(model,"ὦὡὬὨὤὢὠὥὬὡὣ");
             s.FishHp=FishingBindings.Num(FishingBindings.Get(FishingBindings.Get(model,"ὮὬὠὯὡὧὢὥὥὢὦ"),"ὦὬὢὢὮὩὨὨὠὠὯ"),"ὬὤὦὩὮὨὠὬὯὯὣ");
@@ -168,6 +172,18 @@ namespace BD2Fishing.Runtime
         {
             switch(action)
             {
+                case FishingAction.TravelLobby:
+                case FishingAction.TravelReturn:
+                    var mapControl=control;
+                    if(mapControl==null || !mapControl.Valid(DateTime.UtcNow.Ticks,pid) || !mapControl.AutoMapRenewal)
+                        throw new InvalidOperationException("往返换图已取消，请重新开启钓鱼");
+                    if(s.MapTravelBusy || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)
+                        throw new InvalidOperationException("换图状态发生变化，请检查游戏后重新开启");
+                    if(action==FishingAction.TravelLobby && (!s.Ready || s.State!="None") || action==FishingAction.TravelReturn && !s.LobbyReady)
+                        throw new InvalidOperationException("换图入口未就绪，已暂停");
+                    var targetMap=action==FishingAction.TravelLobby?0:policy.ReturnMapGroupId;
+                    LogDiagnostic("map_renewal from="+s.MapGroupId+" to="+targetMap+" start="+s.RoomStartTicks+" remaining="+s.RoomRemainingSeconds);
+                    FishingMap.Travel(mapManager,targetMap);break;
                 case FishingAction.SellFish:
                     var c=control;
                     if(c==null || !c.Valid(DateTime.UtcNow.Ticks,pid) || !c.AutoSell || !s.Ready || s.State!="None" || !s.BagFull || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;

@@ -8,6 +8,10 @@ namespace BD2Fishing
         private long entered, lastInput;
         private bool hookSent, castSent, released, ownsCharge;
         private int closedPopup;
+        private readonly FishingMapRenewal mapRenewal = new FishingMapRenewal();
+        public string MapRenewalStatus => mapRenewal.Status;
+        public int MapRenewals => mapRenewal.Completed;
+        public int ReturnMapGroupId => mapRenewal.OriginalMap;
         public bool Holding {get;private set;}
         public string Fault {get;private set;} = "";
         public string Reason {get;private set;} = "未开启";
@@ -16,7 +20,7 @@ namespace BD2Fishing
         {
             if (c == null || !c.Valid(now,s.ProcessId))
             {
-                owner = ""; Reason = "自动钓鱼已停止";
+                mapRenewal.Cancel(); owner = ""; Reason = "自动钓鱼已停止";
                 if (Holding) {Holding=false; return FishingAction.HoldRelease;}
                 // Finish only the charging press we own, without fabricating a cast grade.
                 if (ownsCharge && !released && s.State=="Casting" && s.CastRunning) {ownsCharge=false;released=true; return FishingAction.CastRelease;}
@@ -24,13 +28,20 @@ namespace BD2Fishing
             }
             if (owner != c.OwnerId)
             {
-                owner=c.OwnerId; state=""; hookSent=castSent=released=false; closedPopup=0; lastInput=0; Fault="";
+                mapRenewal.Cancel(); owner=c.OwnerId; state=""; hookSent=castSent=released=false; closedPopup=0; lastInput=0; Fault="";
             }
             if (s.State != state) {if(s.State!="Casting")ownsCharge=false;state=s.State;entered=now;hookSent=castSent=released=false;}
             if (!s.ResultPopup && !s.LevelPopup) closedPopup=0;
             if (s.Error.Length>0) Fail(s.Error);
             if (s.NetworkPending && s.NetworkWaitSeconds>30) Fail("网络响应超过 30 秒，请核对游戏提示后停止并重新开启");
-            if (Fault.Length>0 || !s.Ready || s.Busy || s.BlockReason.Length>0)
+            if (!holdPhase && Fault.Length==0 && mapRenewal.Next(s,c,now,out var travel))
+            {
+                if(mapRenewal.Fault.Length>0)Fail(mapRenewal.Fault);
+                Reason=mapRenewal.Status;
+                if(Holding){Holding=false;return FishingAction.HoldRelease;}
+                return travel;
+            }
+            if (Fault.Length>0 || !s.Ready || s.Busy || s.MapTravelBusy || s.BlockReason.Length>0)
             {
                 Reason=Fault.Length>0?Fault:s.BlockReason.Length>0?s.BlockReason:!s.Ready?"请进入钓鱼地点并面向可钓区域":"等待场景切换";
                 if(Holding) {Holding=false;return FishingAction.HoldRelease;}

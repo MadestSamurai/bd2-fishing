@@ -48,7 +48,7 @@ namespace BD2Fishing.Runtime
             int count=0;var game=typeof(FishingGameFieldDefaultUI).Assembly;
             foreach(var pair in new Dictionary<string,string[]>{
                 {"FishingGameFieldDefaultUI",new[]{"ὢὨὠὩὤὬὠὧὬὠὬ","_castingCharger","_baitInfo","_skillCaster","_hitzonePicker","_goBtnHook","_goBtnFight","_rectHitzoneNormal","_rectHitzoneWeak","ὬὣὦὫὬὯὧὮὣὣὡ","ὣὥὪὥὫὬὬὮὦὭὩ","ὯὦὦὯὤὪὡὮὢὫὮ"}},
-                {"gamfs.Fishing.FishingManager",new[]{"ὮὧὥὥὦὬὤὭὤὡὪ","ὧὠὤὦὠὡὠὪὪὢὠ","ὯὥὬὦὤὬὡὤὡὡὨ","ὢὣὢὬὣὧὣὫὭὤὬ","ὨὥὯὤὪὣὬὪὤὬὬ","UseItem","HasBuff","ὥὬὪὥὠὣὪὡὢὥὮ"}},
+                {"gamfs.Fishing.FishingManager",new[]{"ὮὧὥὥὦὬὤὭὤὡὪ","ὧὠὤὦὠὡὠὪὪὢὠ","ὯὥὬὦὤὬὡὤὡὡὨ","ὢὣὢὬὣὧὣὫὭὤὬ","ὨὥὯὤὪὣὬὪὤὬὬ","UseItem","HasBuff","ὥὬὪὥὠὣὪὡὢὥὮ","ὭὡὧὡὢὡὬὬὧὥὯ","ὢὪὠὠὩὪὧὧὭὨὬ","ὡὣὧὫὦὯὧὤὧὦὬ","ὣὤὣὬὪὡὥὨὪὫὤ","EnterPackFishing"}},
                 {"FishingBaitInfoItem",new[]{"ὩὯὪὩὯὫὮὤὭὧὢ"}},
                 {"gamfs.Fishing.FishingTimerHub",new[]{"IsRunning","GetRemaining"}},
                 {"FishingCastingCharger",new[]{"ὩὯὪὩὯὫὮὤὭὧὢ","ὩὡὣὢὬὦὥὧὥὭὦ","GetNormalizeValue"}},

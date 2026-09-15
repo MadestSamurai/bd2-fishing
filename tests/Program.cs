@@ -174,4 +174,42 @@ foreach(var gate in new[]{"disabled","network","other-popup","animation"})
 p=new();s=S();s.Busy=true;
 for(int i=0;i<70;i++){time+=TimeSpan.FromSeconds(1).Ticks;Check(p.Next(s,C(),time)==FishingAction.None && p.Fault=="","long scene loading does not end automation");}
 s.Busy=false;Check(p.Next(s,C(),time)==FishingAction.CastPress,"long scene loading resumes without new owner");
+// Room renewal: use real remaining time, settle first, and observe BOTH completed scene and fresh clock.
+var mapTime=time;
+FishingSnapshot MapSample()=>new(){ProcessId=123,Ready=true,State="None",CanCast=true,MapGroupId=3,MapUnlocked=true,RoomTimerKnown=true,RoomStartTicks=100000,RoomDurationSeconds=21600,RoomRemainingSeconds=299};
+FishingControl MapControl()=>new(){OwnerId="map",ProcessId=123,Enabled=true,AutoMapRenewal=true,UntilUtcTicks=mapTime+TimeSpan.FromSeconds(10).Ticks};
+var renewal=new FishingMapRenewal();var ms=MapSample();ms.RoomRemainingSeconds=301;
+Check(!renewal.Next(ms,MapControl(),mapTime,out var ma)&&ma==FishingAction.None,"do not travel before five-minute threshold");
+ms.RoomRemainingSeconds=300;ms.State="Fighting";Check(!renewal.Next(ms,MapControl(),mapTime,out ma),"due renewal keeps fighting");
+ms.State="None";
+foreach(var gate in new[]{"popup","network","sale","bait","daynight","busy","modal"}){
+ ms=MapSample();ms.ResultPopup=gate=="popup";ms.NetworkPending=gate=="network";ms.SalePending=gate=="sale";ms.BaitPending=gate=="bait";ms.MapChangePending=gate=="daynight";ms.Busy=gate=="busy";ms.BlockReason=gate=="modal"?"modal":"";
+ Check(!renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"settle before travel: "+gate);
+}
+ms=MapSample();Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.TravelLobby,"late connection travels based on game clock");
+Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"outbound sent once");
+ms.MapGroupId=0;ms.Ready=false;ms.MapTravelBusy=true;ms.LobbyReady=false;
+mapTime+=TimeSpan.FromSeconds(3).Ticks;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"eager map ID update is not loaded lobby");
+ms.MapTravelBusy=false;ms.LobbyReady=true;renewal.Next(ms,MapControl(),mapTime,out ma);
+mapTime+=TimeSpan.FromSeconds(2).Ticks;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.TravelReturn&&renewal.OriginalMap==3,"return once after stable lobby even without field UI");
+ms=MapSample();Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"old room timestamp must not mark success");
+ms.RoomStartTicks++;ms.RoomRemainingSeconds=21600;ms.CanCast=false;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==0,"wait native fishing position");
+ms.CanCast=true;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==1,"confirm new room and casting readiness");
+Check(!renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"normal fishing resumes without immediate repeat");
+renewal=new();ms=MapSample();renewal.Next(ms,MapControl(),mapTime,out ma);mapTime+=TimeSpan.FromSeconds(121).Ticks;
+Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&renewal.Fault.Length>0&&ma==FishingAction.None,"travel timeout never retries blindly");
+renewal=new();renewal.Next(ms,MapControl(),mapTime,out ma);var disable=MapControl();disable.AutoMapRenewal=false;
+Check(!renewal.Next(ms,disable,mapTime,out ma),"toggle cancels queued return");ms.MapGroupId=0;ms.LobbyReady=true;ms.Ready=false;
+mapTime+=TimeSpan.FromSeconds(3).Ticks;Check(!renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"re-enable does not unexpectedly leave lobby");
+renewal=new();ms=MapSample();renewal.Next(ms,MapControl(),mapTime,out ma);ms.MapGroupId=9;
+Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&renewal.Fault.Length>0,"manual map intervention does not force return");
+renewal=new();ms=MapSample();ms.MapUnlocked=false;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&renewal.Fault.Length>0,"do not leave a map that cannot be returned to");
+// Integration with active cycle: same policy finishes combat and popup before the travel action.
+p=new();ms=MapSample();ms.State="Fighting";ms.WeakHit=true;
+Check(p.Next(ms,MapControl(),mapTime)==FishingAction.FightClick,"due map still permits fighting");
+mapTime+=TimeSpan.FromMilliseconds(100).Ticks;ms.State="Caught";ms.ResultPopup=true;ms.CanClosePopup=true;ms.PopupId=100;
+Check(p.Next(ms,MapControl(),mapTime)==FishingAction.ClosePopup,"due map closes settlement normally");
+mapTime+=TimeSpan.FromMilliseconds(100).Ticks;ms.State="None";ms.ResultPopup=false;
+Check(p.Next(ms,MapControl(),mapTime)==FishingAction.TravelLobby,"travel precedes new cast and consumables");
+Check(p.Next(ms,new FishingControl(),mapTime)==FishingAction.None,"stop revokes pending map travel");
 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{status="pass",assertions,gameRequests=0,injection=false}));

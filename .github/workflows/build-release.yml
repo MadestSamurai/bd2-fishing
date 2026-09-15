@@ -27,7 +27,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: BD2Fishing-win-x64
-          path: dist/*
+          path: dist/v*/*
           if-no-files-found: error
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -46,6 +46,6 @@ jobs:
         run: |
           gh run download $env:GITHUB_RUN_ID --name BD2Fishing-win-x64 --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed' }
-          $assets = @(Get-ChildItem dist -File | ForEach-Object FullName)
+          $assets = @(Get-ChildItem dist -Recurse -File | ForEach-Object FullName)
           gh release create $env:GITHUB_REF_NAME @assets --verify-tag --title "BD2 Fishing $env:GITHUB_REF_NAME" --notes-file docs/RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

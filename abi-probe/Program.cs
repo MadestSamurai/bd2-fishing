@@ -5,7 +5,7 @@ var managed=Path.GetFullPath(args[0]);var hookPath=Path.GetFullPath(args[1]);Ass
 AppDomain.CurrentDomain.AssemblyResolve+=(_,e)=>{var name=new AssemblyName(e.Name).Name;if(name=="0Harmony"&&hook!=null){using var s=hook.GetManifestResourceStream("BD2Fishing.Harmony.dll")!;using var b=new MemoryStream();s.CopyTo(b);return Assembly.Load(b.ToArray());}var file=Path.Combine(managed,name+".dll");return File.Exists(file)?Assembly.LoadFrom(file):null;};
 hook=Assembly.LoadFrom(hookPath);var types=hook.GetTypes();int assertions=0;
 void Check(bool ok,string message){assertions++;if(!ok)throw new Exception(message);}
-Check(hook.GetName().Name=="BD2Fishing.Runtime6","identity");
+Check(hook.GetName().Name=="BD2Fishing.Runtime7","identity");
 Check(!types.Any(t=>new[]{"Sichuan","Watcher","Golden","Mirror","ReplayCapture"}.Any(n=>(t.FullName??"").Contains(n))),"unrelated type closure");
 var identity=hook.GetType("BD2Fishing.FishingIdentity")!;var game=Assembly.LoadFrom(Path.Combine(managed,"Assembly-CSharp.dll"));
 var flags=BindingFlags.Static|BindingFlags.NonPublic;
@@ -63,6 +63,18 @@ var inventoryType=hook.GetType("BD2Fishing.Runtime.FishingInventory")!;
 Check(inventoryType.GetMethod("SaleMethod",flags)!.Invoke(null,null) is MethodInfo,"normal game batch-sale helper");
 var rarity=Role("FishGrade");
 Check(Convert.ToInt32(Enum.Parse(rarity,"Legendary"))==4 && Convert.ToInt32(Enum.Parse(rarity,"Normal"))==1 && Convert.ToInt32(Enum.Parse(rarity,"Rare"))==2,"client rarity values match protection policy");
+var mapType=hook.GetType("BD2Fishing.Runtime.FishingMap")!;
+var fillClock=mapType.GetMethod("FillClock",flags)!;
+var clockStart=new DateTime(2026,9,15,8,0,0,DateTimeKind.Unspecified);
+fillClock.Invoke(null,new object[]{mapSnapshot,clockStart,clockStart.AddHours(5).AddMinutes(56),21600d});
+Check((bool)snapshotType.GetProperty("RoomTimerKnown")!.GetValue(mapSnapshot)! && (double)snapshotType.GetProperty("RoomRemainingSeconds")!.GetValue(mapSnapshot)! == 240,"room clock uses game timestamps for late connections");
+fillClock.Invoke(null,new object[]{mapSnapshot,clockStart,clockStart.AddHours(-8),21600d});
+Check(!(bool)snapshotType.GetProperty("RoomTimerKnown")!.GetValue(mapSnapshot)!,"mixed or future clock must not cause travel");
+foreach(var role in new[]{"Clock.Instance","Clock.Now","Tables.Default","Inventory.MapUnlocked"})
+ Check(bindings.GetMethod("Api",flags)!.Invoke(null,new object[]{role}) is MemberInfo,"map API resolves: "+role);
+Check(((MethodInfo)Member(managerType,"EnterPackFishing")).GetParameters().Single().ParameterType==typeof(int),"native group travel method");
+Check(((FieldInfo)Member(managerType,"ὡὣὧὫὦὯὧὤὧὦὬ")).FieldType.FullName=="UnityEngine.Coroutine","real load coroutine gate");
+Check(((PropertyInfo)Member(managerType,"ὢὪὠὠὩὪὧὧὭὨὬ")).PropertyType==typeof(DateTime),"native room start timestamp");
 var fishType=hook.GetType("BD2Fishing.FishingSaleItem")!;
 var fish=Activator.CreateInstance(fishType)!;
 foreach(var v in new Dictionary<string,object>{{"InvenIndex",9123456789L},{"FishId",123},{"Grade",2},{"HasFishTable",true},{"HasSaleEntry",true}})fishType.GetProperty(v.Key)!.SetValue(fish,v.Value);

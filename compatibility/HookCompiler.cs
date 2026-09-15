@@ -29,7 +29,7 @@ public static class HookCompiler
         foreach(var file in Directory.EnumerateFiles(managed,"*.dll").OrderBy(x=>x,StringComparer.Ordinal))
         {try{refs.Add(MetadataReference.CreateFromFile(file));}catch(BadImageFormatException){}}
         refs.Add(MetadataReference.CreateFromImage(Resource("BD2Fishing.Harmony.dll")));
-        var compilation=CSharpCompilation.Create("BD2Fishing.Runtime6",sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
+        var compilation=CSharpCompilation.Create("BD2Fishing.Runtime7",sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
         using var stream=new MemoryStream();
         var emit=compilation.Emit(stream,manifestResources:new[]{new ResourceDescription("BD2Fishing.Harmony.dll",()=>new MemoryStream(Resource("BD2Fishing.Harmony.dll")),true)});
         if(!emit.Success)throw new InvalidOperationException("当前客户端接口无法编译，尚未注入。\n"+string.Join("\n",emit.Diagnostics.Where(d=>d.Severity==DiagnosticSeverity.Error).Take(30)));
@@ -46,7 +46,7 @@ public static class HookCompiler
     }
     private static void ValidateDataProperties(ResolvedBindings r)
     {
-        foreach(var check in new[]{("Tables.Bait","Id,BuffId"),("Tables.Buff","Id"),("Tables.Fish","Id,Grade"),("Tables.Shop","ShopItemId"),("Tables.ShopEntries","GroupId,ItemType,ItemId,PriceCount"),("Player.Data","FishingFishInvenSlot")})
+        foreach(var check in new[]{("Tables.Default","RoomDuration"),("Tables.Bait","Id,BuffId"),("Tables.Buff","Id"),("Tables.Fish","Id,Grade"),("Tables.Shop","ShopItemId"),("Tables.ShopEntries","GroupId,ItemType,ItemId,PriceCount"),("Player.Data","FishingFishInvenSlot")})
         {
             var member=BindingResolver.Api(r,r.Contract.Apis.Single(a=>a.Role==check.Item1));
             TypeReference result=member switch {MethodDefinition m=>m.ReturnType,PropertyDefinition p=>p.PropertyType,FieldDefinition f=>f.FieldType,_=>throw new InvalidOperationException("Unsupported data API")};

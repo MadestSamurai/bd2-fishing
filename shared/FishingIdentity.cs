@@ -3,7 +3,7 @@ namespace BD2Fishing
 {
     public static partial class FishingIdentity
     {
-        public const string RuntimeName = "BD2Fishing.Runtime6";
+        public const string RuntimeName = "BD2Fishing.Runtime7";
         public static string DataRoot => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BD2Fishing");
         public static bool IsGameProcessName(string name) => string.Equals(name,"BrownDust II",StringComparison.OrdinalIgnoreCase) || string.Equals(name,"BrownDust II.exe",StringComparison.OrdinalIgnoreCase);
     }
@@ -26,6 +26,7 @@ namespace BD2Fishing
         public bool PreferWeak {get;set;} = true;
         public bool AutoSell {get;set;}
         public bool AutoBait {get;set;}
+        public bool AutoMapRenewal {get;set;}
         public bool Valid(long now, int pid) => Enabled && !string.IsNullOrEmpty(OwnerId) && ProcessId == pid && UntilUtcTicks > now && UntilUtcTicks <= now + TimeSpan.FromSeconds(15).Ticks && ValidSettings(NextCastMilliseconds, CastGauge);
         public static bool ValidSettings(int delay, double gauge) => delay >= 0 && delay <= 60000 && !double.IsNaN(gauge) && gauge >= .05 && gauge <= .95;
     }
@@ -63,6 +64,16 @@ namespace BD2Fishing
         // Pending waits for the current fishing cycle to reach None; Busy means active scene switching.
         public bool MapChangePending {get;set;}
         public bool Busy {get;set;}
+        public int MapGroupId {get;set;} = -1;
+        public bool MapTravelBusy {get;set;}
+        public bool LobbyReady {get;set;}
+        public bool MapUnlocked {get;set;}
+        public long RoomStartTicks {get;set;}
+        public double RoomDurationSeconds {get;set;}
+        public double RoomRemainingSeconds {get;set;}
+        public bool RoomTimerKnown {get;set;}
+        public string MapRenewalStatus {get;set;} = "地图倒计时：尚未读取";
+        public int MapRenewals {get;set;}
         public string UiLayers {get;set;} = "";
         public string BlockReason {get;set;} = "";
         public string Error {get;set;} = "";
@@ -105,5 +116,5 @@ namespace BD2Fishing
         public string LastAction {get;set;} = "";
         public long ActionCount {get;set;}
     }
-    public enum FishingAction { None, CastPress, CastRelease, Hook, FightClick, HoldPress, HoldRelease, ClosePopup, SellFish, UseBait }
+    public enum FishingAction { None, CastPress, CastRelease, Hook, FightClick, HoldPress, HoldRelease, ClosePopup, SellFish, UseBait, TravelLobby, TravelReturn }
 }
