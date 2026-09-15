@@ -8,7 +8,7 @@
 - [ ] 执行 `package.ps1 -Locked`，确认 Portable／Lite 两个单 EXE、运行库模式与 WPF 离线检查均通过。
 - [ ] 如修改 Hook，针对合法安装的当前客户端运行 `compatibility-cli check` 与 `abi-probe`；可用旧版则一并验证。
 - [ ] 确认提交清单仅含源码、接口契约、文档、依赖锁文件和许可证。禁止提交客户端 DLL、采集文件、诊断、连接状态或账号信息。
-- [ ] 审阅 `docs/RELEASE_NOTES.md`，用表格说明 Portable 与 Lite 的运行库区别，准确标注实机验证状态。
+- [ ] 审阅 `docs/RELEASE_NOTES.md`：面向使用者说明功能变化、Portable／Lite 区别与升级步骤。Runtime 编号、接口实现和内部验证记录保留在维护文档中，不写入 Release 正文。
 - [ ] 核对 Lite 的 runtimeconfig 使用 Microsoft.WindowsDesktop.App 8.0.0（可向更新的 8.0 补丁滚动），Portable 内置固定的运行库版本；两版均为单 EXE。
 - [ ] 推送源码后再创建并推送 `vX.Y.Z` 标签。GitHub Actions 自动构建 EXE／ZIP、校验和及 Release；流程只使用 `contents: write` 发布权限。
 - [ ] 下载 Release 资产核对 SHA256，检查 README、许可证及版本显示。
