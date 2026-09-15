@@ -1,0 +1,8 @@
+<Project>
+  <!-- SDK 8 and SDK 10 otherwise select different implicit linker packages and break locked restore. -->
+  <ItemGroup>
+    <KnownILLinkPack Update="Microsoft.NET.ILLink.Tasks">
+      <ILLinkPackVersion>8.0.30</ILLinkPackVersion>
+    </KnownILLinkPack>
+  </ItemGroup>
+</Project>

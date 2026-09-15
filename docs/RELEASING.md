@@ -3,6 +3,7 @@
 ## 普通应用更新
 
 - [ ] 修改 `Directory.Build.props` 的版本，并更新 README 下载文件名与发布说明。
+- [ ] 升级 .NET 时同步检查桌面项目的 `RuntimeFrameworkVersion`、`Directory.Build.targets` 中链接器版本与依赖锁文件，避免不同 SDK 的隐式依赖漂移。
 - [ ] 执行 `build.ps1 -Locked`，确认决策／保护与兼容测试通过。
 - [ ] 执行 `package.ps1 -Locked`，确认单 EXE 和 WPF 离线检查通过。
 - [ ] 如修改 Hook，针对合法安装的当前客户端运行 `compatibility-cli check` 与 `abi-probe`；可用旧版则一并验证。
