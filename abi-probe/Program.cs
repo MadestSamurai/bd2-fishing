@@ -79,13 +79,21 @@ var fishType=hook.GetType("BD2Fishing.FishingSaleItem")!;
 var fish=Activator.CreateInstance(fishType)!;
 foreach(var v in new Dictionary<string,object>{{"InvenIndex",9123456789L},{"FishId",123},{"Grade",2},{"HasFishTable",true},{"HasSaleEntry",true}})fishType.GetProperty(v.Key)!.SetValue(fish,v.Value);
 var samples=Array.CreateInstance(fishType,1);samples.SetValue(fish,0);
-var salePlan=hook.GetType("BD2Fishing.FishingSalePlan")!.GetMethod("Build")!.Invoke(null,new object[]{samples})!;
+var buildSale=hook.GetType("BD2Fishing.FishingSalePlan")!.GetMethod("Build")!;
+var salePlan=buildSale.Invoke(null,new object[]{samples,true})!;
 var items=(System.Collections.IList)inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{salePlan})!;
 var item=items[0]!;object Val(string n)=>((PropertyInfo)Member(item.GetType(),n)).GetValue(item)!;
 Check(items.Count==1 && Convert.ToInt32(Val("ὢὯὧὤὮὭὮὣὭὪὣ"))==123 && Convert.ToInt64(Val("ὠὬὩὥὥὨὠὭὩὬὬ"))==9123456789L && Convert.ToInt32(Val("ὬὯὭὩὡὮὩὨὢὭὣ"))==56 && Convert.ToInt32(Val("ὬὯὫὯὮὠὡὪὤὣὬ"))==1,"normal sale DTO preserves concrete inventory ID, fish type and quantity");
 fishType.GetProperty("Grade")!.SetValue(fish,4);
 bool protectedRejected=false;try{inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{salePlan});}catch(TargetInvocationException e)when(e.InnerException is InvalidOperationException){protectedRejected=true;}
 Check(protectedRejected,"runtime request builder rechecks protected grade");
+fishType.GetProperty("IsLocked")!.SetValue(fish,true);
+var optOutPlan=buildSale.Invoke(null,new object[]{samples,false})!;
+var optOutItems=(System.Collections.IList)inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{optOutPlan})!;
+Check(optOutItems.Count==1,"runtime request builder accepts locked legendary fish after explicit opt-out");
+fishType.GetProperty("HasSaleEntry")!.SetValue(fish,false);
+bool unknownRejected=false;try{inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{optOutPlan});}catch(TargetInvocationException e)when(e.InnerException is InvalidOperationException){unknownRejected=true;}
+Check(unknownRejected,"opt-out still rechecks native sale eligibility");
 var baitType=hook.GetType("BD2Fishing.Runtime.FishingBait")!;
 var useMethod=(MethodInfo)baitType.GetMethod("UseMethod",flags)!.Invoke(null,null)!;
 Check(useMethod.ReturnType==typeof(void) && useMethod.GetParameters()[3].HasDefaultValue && (int)useMethod.GetParameters()[3].DefaultValue! == 1,"native bait use quantity defaults to one");

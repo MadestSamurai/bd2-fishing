@@ -15,13 +15,13 @@ public partial class FishingWindow:Window
   root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
   var s=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))??new();
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))s=new();
-  IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
+  IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;KeepFishBox.IsChecked=s.KeepLegendaryAndLocked;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
   initialized=true;timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};timer.Tick+=(_,_)=>Refresh();timer.Start();
  }
  private FishingSettings Settings()
  {
   if(!int.TryParse(IntervalBox.Text,out var delay)||!double.TryParse(CastBox.Text,NumberStyles.Number,CultureInfo.InvariantCulture,out var gauge)||!FishingControl.ValidSettings(delay,gauge/100))throw new InvalidOperationException("请输入 0–60000 毫秒的间隔，以及 5–95% 的蓄力。");
-  return new(){NextCastMilliseconds=delay,CastGauge=gauge/100,PreferWeak=WeakBox.IsChecked==true,AutoSell=AutoSellBox.IsChecked==true,AutoBait=AutoBaitBox.IsChecked==true,AutoMapRenewal=AutoMapBox.IsChecked==true};
+  return new(){NextCastMilliseconds=delay,CastGauge=gauge/100,PreferWeak=WeakBox.IsChecked==true,AutoSell=AutoSellBox.IsChecked==true,KeepLegendaryAndLocked=KeepFishBox.IsChecked==true,AutoBait=AutoBaitBox.IsChecked==true,AutoMapRenewal=AutoMapBox.IsChecked==true};
  }
  private void SettingsChanged(object sender,RoutedEventArgs e)
  {
@@ -73,6 +73,6 @@ public partial class FishingWindow:Window
   StartButton.IsEnabled=!link.Enabled&&!connecting&&s.Ready&&!s.NetworkPending&&s.State!="Auto";StopButton.IsEnabled=link.Enabled;
  }
  private static string StateName(string s)=>s switch{"None"=>"准备抛竿","Casting"=>"蓄力抛竿","WaitingForBite"=>"等待咬钩","BiteDetected"=>"提竿","Fighting"=>"收线","Pause"=>"波次间隔","Caught"=>"收获结算","Auto"=>"游戏内自动钓鱼",_=>"未就绪"};
- private static string ActionName(string s)=>s switch{"CastPress"=>"开始蓄力","CastRelease"=>"释放抛竿","Hook"=>"提竿","FightClick"=>"收线点击","HoldPress"=>"按住收线","HoldRelease"=>"松开收线","ClosePopup"=>"确认弹窗","SellFish"=>"出售普通／稀有鱼","UseBait"=>"使用一份鱼饵","TravelLobby"=>"前往钓鱼大厅","TravelReturn"=>"返回原钓场",_=>"尚未操作"};
+ private static string ActionName(string s)=>s switch{"CastPress"=>"开始蓄力","CastRelease"=>"释放抛竿","Hook"=>"提竿","FightClick"=>"收线点击","HoldPress"=>"按住收线","HoldRelease"=>"松开收线","ClosePopup"=>"确认弹窗","SellFish"=>"出售鱼","UseBait"=>"使用一份鱼饵","TravelLobby"=>"前往钓鱼大厅","TravelReturn"=>"返回原钓场",_=>"尚未操作"};
  private void OnClosing(object? sender,CancelEventArgs e){closing=true;timer.Stop();link.Dispose();}
 }

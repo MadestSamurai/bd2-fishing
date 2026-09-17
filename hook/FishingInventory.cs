@@ -17,7 +17,7 @@ namespace BD2Fishing.Runtime
         internal static MethodInfo SaleMethod()=>(MethodInfo)FishingBindings.Api("Inventory.Sell");
         private static List<FishingFishDBInfo> Bag() => ((System.Collections.IEnumerable)FishingBindings.Invoke("Inventory.FishList"))?.Cast<FishingFishDBInfo>().ToList();
         internal void AcknowledgeError()=>progress.AcknowledgeError();
-        private void Refresh(long now)
+        private void Refresh(long now,bool keepLegendaryAndLocked)
         {
             lastRead=now;plan=null;groupId=0;problem="";
             try
@@ -36,11 +36,11 @@ namespace BD2Fishing.Runtime
                     var table=FishingBindings.Invoke("Tables.Fish",f.Id);
                     items.Add(new FishingSaleItem{InvenIndex=f.InvenIndex,FishId=f.Id,IsLocked=f.IsLock,Grade=table==null?0:(int)FishingBindings.Num(table,"Grade"),HasFishTable=table!=null && FishingBindings.Num(table,"Id")==f.Id,HasSaleEntry=sellableIds.Contains(f.Id)});
                 }
-                plan=FishingSalePlan.Build(items);
+                plan=FishingSalePlan.Build(items,keepLegendaryAndLocked);
             }
             catch(Exception e){problem=e.GetBaseException().Message;}
         }
-        internal void Fill(FishingSnapshot s,long now)
+        internal void Fill(FishingSnapshot s,long now,bool keepLegendaryAndLocked)
         {
             if(progress.Pending)
             {
@@ -57,22 +57,22 @@ namespace BD2Fishing.Runtime
             var bag=Bag();
             s.BagCount=bag?.Count??0;
             s.BagCapacity=(int)FishingBindings.Num(FishingBindings.Read("Player.Data",null),"FishingFishInvenSlot");
-            if(!progress.Pending && s.State=="None" && now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks)Refresh(now);
+            if(!progress.Pending && s.State=="None" && ((plan!=null && plan.KeepLegendaryAndLocked!=keepLegendaryAndLocked) || now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks))Refresh(now,keepLegendaryAndLocked);
             s.SaleReady=plan!=null && problem.Length==0;s.SellableCount=plan?.Sellable??0;s.ProtectedFishCount=plan?.Protected??0;
             if(problem.Length>0)s.SaleStatus=problem;
         }
         internal static System.Collections.IList RequestItems(FishingSalePlan freshPlan)
         {
-            if(freshPlan==null || freshPlan.Items.Length==0 || freshPlan.Items.Any(f=>!FishingSalePlan.CanSell(f)))throw new InvalidOperationException("出售清单未通过保护检查");
+            if(freshPlan==null || freshPlan.Items.Length==0 || freshPlan.Items.Any(f=>!FishingSalePlan.CanSell(f,freshPlan.KeepLegendaryAndLocked)))throw new InvalidOperationException("出售清单未通过保护检查");
             var itemType=FishingBindings.Type("SaleItem");
             var list=(System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(itemType));
             foreach(var f in freshPlan.Items)list.Add(Activator.CreateInstance(itemType,new object[]{f.FishId,FishingBindings.EnumValue("ItemType","Fish"),1,f.InvenIndex}));
             return list;
         }
-        internal bool Sell(long now,long replySerial)
+        internal bool Sell(long now,long replySerial,bool keepLegendaryAndLocked)
         {
             // Re-read locks, rarity, shop group and concrete inventory IDs immediately before sending.
-            Refresh(now);
+            Refresh(now,keepLegendaryAndLocked);
             if(plan==null || problem.Length>0 || plan.Items.Length==0)return false;
             var items=RequestItems(plan);
             replyAtSend=replySerial;progress.Begin(plan,now);

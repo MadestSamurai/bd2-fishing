@@ -25,6 +25,8 @@ namespace BD2Fishing
         public double CastGauge {get;set;} = 0.9;
         public bool PreferWeak {get;set;} = true;
         public bool AutoSell {get;set;}
+        // DataContractJsonSerializer skips initializers: missing/null means retain.
+        public bool? KeepLegendaryAndLocked {get;set;} = true;
         public bool AutoBait {get;set;}
         public bool AutoMapRenewal {get;set;}
         public bool Valid(long now, int pid) => Enabled && !string.IsNullOrEmpty(OwnerId) && ProcessId == pid && UntilUtcTicks > now && UntilUtcTicks <= now + TimeSpan.FromSeconds(15).Ticks && ValidSettings(NextCastMilliseconds, CastGauge);
