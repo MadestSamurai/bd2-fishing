@@ -84,7 +84,7 @@ namespace BD2Fishing.Runtime
                 if(holdPhase && (ui==null || !ReferenceEquals(FishingBindings.Get(FishingBindings.Get(ui,"_skillCaster"),"_holdItem"),hold)))return;
                 var s=Read(now);var c=control??new FishingControl();
                 if(c.Valid(now,pid) && observedOwner!=c.OwnerId){observedOwner=c.OwnerId;network.AcknowledgeError();inventory.AcknowledgeError();bait.AcknowledgeError();}
-                network.Fill(s);inventory.Fill(s,now,c.KeepLockedOnly);bait.Fill(ui,s,now);
+                network.Fill(s);inventory.Fill(s,now,c);bait.Fill(ui,s,now);
                 if(!holdPhase)navigation.Reconcile(s,c,now,policy.Fault.Length>0);
                 var action=policy.Next(s,c,now,holdPhase);
                 if(action!=FishingAction.None)Apply(action,s);
@@ -190,7 +190,7 @@ namespace BD2Fishing.Runtime
                 case FishingAction.SellFish:
                     var c=control;
                     if(c==null || !c.Valid(DateTime.UtcNow.Ticks,pid) || !c.AutoSell || !s.Ready || s.State!="None" || !s.BagFull || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
-                    if(!inventory.Sell(DateTime.UtcNow.Ticks,s.SaleReplySerial,c.KeepLockedOnly))return;
+                    if(!inventory.Sell(DateTime.UtcNow.Ticks,s,c))return;
                     break;
                 case FishingAction.UseBait:
                     var baitControl=control;

@@ -30,12 +30,44 @@ Check(!FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!.Enab
 p=new();s=S("Fighting");s.HoldActive=true;s.HoldInside=true;s.HoldStartHit=true;Step(p,s,100,true);s.HoldTracking=true;s.HoldStartHit=false;s.Freeze=true;Check(Step(p,s)==FishingAction.FightClick,"freeze can be cleared without dropping ongoing hold");
 var rng=new Random(73021);
 for(int i=0;i<1000;i++){p=new();s=S("BiteDetected");Check(Step(p,s)==FishingAction.Hook,"random bite accepted");for(int k=0;k<rng.Next(2,15);k++)Check(Step(p,s,rng.Next(81,501))==FishingAction.None,"jitter cannot repeat hook");}
-// Inventory selection and reply verification: never sell legendary/locked/unknown items.
-FishingSaleItem Fish(long id,int grade=1,bool locked=false,bool hasTable=true,bool listed=true)=>new(){InvenIndex=id,FishId=(int)id+1000,Grade=grade,IsLocked=locked,HasFishTable=hasTable,HasSaleEntry=listed};
+// Inventory selection and reply verification: protected by default, explicit opt-out.
+FishingSaleItem Fish(long id,int grade=1,bool locked=false,bool hasTable=true,bool listed=true)=>new(){InvenIndex=id,FishId=(int)id+1000,Grade=grade,IsLocked=locked,HasFishTable=hasTable,HasSaleEntry=listed,Size=20};
 var bag=new[]{Fish(1),Fish(2,2),Fish(3,4),Fish(4,4),Fish(5,1,true),Fish(6,3),Fish(7,0),Fish(8,2,false,false),Fish(9,2,false,true,false)};
 var plan=FishingSalePlan.Build(bag);
 Check(plan.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,2}),"only unlocked known normal and rare fish selected");
 Check(plan.Protected==7 && plan.KeepIds.Length==7,"all legendary copies and unknown fish retained");
+var unrestrictedOptions=new FishingRetentionOptions{KeepLegendary=false,KeepLocked=false};
+var unrestricted=FishingSalePlan.Build(bag,unrestrictedOptions);
+Check(unrestricted.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,2,3,4,5}),"opt-out includes unlock candidates but retains unknown grades and missing data");
+Check(unrestricted.RequiresUnlock.SequenceEqual(new long[]{5}),"locked candidate requires native unlock first");
+bool lockedRejected=false;try{new FishingSaleProgress().Begin(unrestricted,time);}catch(InvalidOperationException){lockedRejected=true;}
+Check(lockedRejected,"sale rejects locked candidate before verified unlock");
+foreach(var legend in new[]{false,true})foreach(var keep in new[]{false,true})foreach(var sell in new[]{false,true})
+{
+ using(var link=new FishingControlLink(data))
+ {
+  link.Configure(new(){AutoSell=sell,Retention=new FishingRetentionOptions{KeepLegendary=legend,KeepLocked=keep}});link.Start(123);
+  var stored=FishingJson.Read<FishingSettings>(Path.Combine(data,"settings.json"))!;
+  using var stream=File.OpenRead(Path.Combine(data,"control.json"));
+  var command=(FishingControl)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(FishingControl)).ReadObject(stream)!;
+  Check(stored.AutoSell==sell && stored.Retention.KeepLegendary==legend && stored.Retention.KeepLocked==keep && command.AutoSell==sell && command.Retention.KeepLegendary==legend && command.Retention.KeepLocked==keep,"independent options survive settings and runtime serialization");
+ }
+}
+Check(System.Text.Json.JsonSerializer.Deserialize<FishingSettings>("{\"AutoSell\":false}")!.Retention.KeepLegendary!=false,"old settings retain fish by default");
+using(var stream=new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"AutoSell\":true}")))
+{
+ var command=(FishingControl)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(FishingControl)).ReadObject(stream)!;
+ Check(command.Retention==null || command.Retention.KeepLegendary!=false,"old runtime commands retain fish by default");
+}
+var legendaryBag=Enumerable.Range(1,230).Select(i=>Fish(i,4)).ToArray();
+var legendaryPlan=FishingSalePlan.Build(legendaryBag,unrestrictedOptions);
+Check(legendaryPlan.Items.Length==100 && legendaryPlan.Sellable==230 && legendaryPlan.KeepIds.Length==130,"legendary-only opt-out remains bounded");
+var legendaryPolicy=new FishingPolicy();var legendarySnapshot=S();legendarySnapshot.BagFull=true;legendarySnapshot.SaleReady=true;legendarySnapshot.SellableCount=legendaryPlan.Sellable;
+var legendaryControl=C();legendaryControl.AutoSell=true;legendaryControl.Retention=unrestrictedOptions;
+Check(legendaryPolicy.Next(legendarySnapshot,legendaryControl,time)==FishingAction.SellFish,"legendary-only full bag can sell after opt-out");
+var legendaryProgress=new FishingSaleProgress();legendaryProgress.Begin(legendaryPlan,time);legendaryProgress.Observe(true,true,legendaryPlan.KeepIds,time);
+legendarySnapshot.BagFull=false;legendarySnapshot.SalePending=legendaryProgress.Pending;
+Check(legendaryProgress.SoldCount==100 && legendaryPolicy.Next(legendarySnapshot,legendaryControl,time+TimeSpan.FromSeconds(2).Ticks)==FishingAction.CastPress,"confirmed legendary sale frees space and resumes casting");
 var large=FishingSalePlan.Build(Enumerable.Range(1,230).Select(i=>Fish(i)));
 Check(large.Items.Length==100 && large.KeepIds.Length==130 && large.Sellable==230,"bounded batch retains all unsubmitted IDs");
 bool throws=false;try{FishingSalePlan.Build(new[]{Fish(1),Fish(1,4)});}catch(InvalidOperationException){throws=true;}Check(throws,"duplicate ID cannot sell protected alias");
@@ -221,19 +253,6 @@ ms=MapSample();ms.RoomStartTicks++;ms.RoomRemainingSeconds=21600;ms.CanCast=fals
 Check(p.Next(ms,returnControl,mapTime)==FishingAction.None&&p.MapRenewals==1,"room renewal finishes before shoreline positioning");
 mapTime+=TimeSpan.FromMilliseconds(100).Ticks;Check(p.Next(ms,returnControl,mapTime)==FishingAction.ApproachWater,"renewal hands off to approach without reentering map");
 ms.CanCast=true;mapTime+=TimeSpan.FromSeconds(2).Ticks;Check(p.Next(ms,returnControl,mapTime)==FishingAction.CastPress,"native casting readiness resumes ordinary fishing");
-// Locked-only selling permits known unlocked legendary fish, with every other protection retained.
-var lockedOnly=FishingSalePlan.Build(new[]{Fish(1,4),Fish(2,4,true),Fish(3,1),Fish(4,2),Fish(5,0),Fish(6,4,false,false),Fish(7,4,false,true,false)},true);
-Check(lockedOnly.KeepLockedOnly&&lockedOnly.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,3,4}),"locked-only sells known unlocked fish of all supported grades");
-Check(lockedOnly.KeepIds.SequenceEqual(new long[]{2,5,6,7}),"locked unknown and unlisted fish are retained");
-var lockedProgress=new FishingSaleProgress();lockedProgress.Begin(lockedOnly,time);lockedProgress.Observe(true,true,new long[]{2,5,6,7},time+1);Check(lockedProgress.SoldCount==3&&lockedProgress.Error=="","locked-only sale reconciles exact kept IDs");
-lockedOnly=FishingSalePlan.Build(new[]{Fish(1,4)},true);lockedOnly.Items[0].IsLocked=true;throws=false;try{new FishingSaleProgress().Begin(lockedOnly,time);}catch(InvalidOperationException){throws=true;}Check(throws,"new mode rechecks a lock added after planning");
-Check(!oldSettings.KeepLockedOnly&&oldSettings.AutoApproach,"older settings preserve legendary protection and enable approach");
-for(int seed=0;seed<50;seed++){
- var rr=new Random(seed);var many=Enumerable.Range(1,180).Select(i=>Fish(i,new[]{0,1,2,3,4,5}[rr.Next(6)],rr.Next(3)==0,rr.Next(4)!=0,rr.Next(4)!=0)).ToArray();
- var chosen=FishingSalePlan.Build(many,true);var selected=chosen.Items.Select(x=>x.InvenIndex).ToHashSet();
- Check(chosen.Items.All(f=>!f.IsLocked&&f.HasFishTable&&f.HasSaleEntry&&(f.Grade==1||f.Grade==2||f.Grade==4)),"random locked-only protection");
- Check(chosen.KeepIds.Length+chosen.Items.Length==many.Length&&chosen.KeepIds.All(id=>!selected.Contains(id)),"locked-only sale and retained IDs partition inventory");
-}
 // First entry and refreshed rooms both approach the casting area, with no action during a fight or popup.
 FishingSnapshot Away()=>new(){ProcessId=123,Ready=true,State="None",MapGroupId=3,CanCast=false};
 FishingControl Walk()=>new(){ProcessId=123,Enabled=true,OwnerId="walk",AutoApproach=true,UntilUtcTicks=time+TimeSpan.FromSeconds(10).Ticks};
@@ -250,4 +269,7 @@ walking.Reset();walking.Begin(time,10);Check(walking.Observe(time+TimeSpan.FromS
 Check(walking.Observe(time+TimeSpan.FromSeconds(91).Ticks,3,false)==ApproachDecision.Retry,"long route still has a deadline");
 walking.Reset();walking.Begin(time,0);Check(walking.Observe(time+TimeSpan.FromMilliseconds(500).Ticks,0,true)==ApproachDecision.Continue&&walking.Observe(time+TimeSpan.FromSeconds(1).Ticks,0,true)==ApproachDecision.Retry,"arrival waits for actual native casting permission");
 NavigationRegression.Run(Check);
+assertions+=RetentionTests.Run();
+assertions+=UnlockTests.Run();
+assertions+=LocalizationTests.Run();
 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{status="pass",assertions,gameRequests=0,injection=false}));

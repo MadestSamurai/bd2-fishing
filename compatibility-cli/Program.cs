@@ -16,7 +16,7 @@ else if(args[0]=="check")
     try
     {
         var hook=HookCompiler.Prepare(args[1],args.Length>3?JsonSerializer.Deserialize<BindingContract>(File.ReadAllText(args[3])):null);
-        File.WriteAllBytes(Path.Combine(args[2],"BD2Fishing.Runtime9.dll"),hook.Payload);
+        File.WriteAllBytes(Path.Combine(args[2],"BD2Fishing.Runtime10.dll"),hook.Payload);
         File.WriteAllText(Path.Combine(args[2],"compatibility.json"),JsonSerializer.Serialize(hook.Report,options));
         Console.WriteLine(JsonSerializer.Serialize(hook.Report));
     }

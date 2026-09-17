@@ -21,7 +21,7 @@
 
 ```powershell
 # 不注入、不连接服务器，只检查元数据并编译内存组件。
-BD2Fishing-0.3.2-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
+BD2Fishing-0.4.0-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
 ```
 
 维护者的详细检查：
@@ -45,3 +45,7 @@ dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Mana
 只有接口确认发生不兼容变动时，才审阅失败项并更新 Runtime 或维护者引导定义 `ContractGenerator.cs`。更新后用 `generate <Managed> <hook source dir> <contract.json>` 生成新契约，再对可用版本执行检查。契约只保存本功能所需的接口描述和不可逆指纹，不保存方法正文或游戏资源。
 
 不要将“用新客户端重建了契约、再在同一客户端通过”当成跨版本验证；必须保留旧契约对新版本的检查结果，以及新契约对仍需支持版本的复核结果。
+
+## Languages
+
+Every Portable/Lite EXE includes Chinese and English. ZIPs include both README files. Release notes contain both language sections and a runtime comparison table. See [Localization](LOCALIZATION.md).

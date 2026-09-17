@@ -5,4 +5,4 @@
     <Compile Include="../vendor/SharpMonoInjector/*.cs" Link="Injector/%(Filename)%(Extension)" />
     <ProjectReference Include="../compatibility/BD2Fishing.Compatibility.csproj" />
   </ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../localization/LanguageCatalog.cs"/><EmbeddedResource Include="../localization/*.json" LogicalName="Locale.%(Filename)%(Extension)"/></ItemGroup></Project>

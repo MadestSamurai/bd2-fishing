@@ -18,6 +18,7 @@ namespace BD2Fishing.Runtime
         private string last="尚无钓鱼请求", error="";
         private int catches;private long saleReplySerial;private bool saleReplyAccepted;
         private long baitReplySerial;private bool baitReplyAccepted;
+        private long unlockReplySerial,unlockReplyIndex;private bool unlockReplyAccepted;
         internal static MethodInfo SendMethod()=>typeof(BDNetwork.NetworkManager).GetMethods(BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance).Single(m=>m.Name=="Send" && m.ReturnType==typeof(void) && m.GetParameters().Length==6 && m.GetParameters()[0].ParameterType==typeof(Google.Protobuf.IMessage));
         internal static Dictionary<MethodBase,string> ResolveHandlers()
         {
@@ -35,14 +36,14 @@ namespace BD2Fishing.Runtime
         internal void Start()
         {
             handlers=ResolveHandlers(); current=this;
-            try {foreach(var m in handlers.Keys)patch.Patch(m,postfix:new HarmonyMethod(typeof(FishingNetwork),nameof(Response)));patch.Patch(SendMethod(),prefix:new HarmonyMethod(typeof(FishingNetwork),nameof(Sent)));}
+            try {foreach(var m in handlers.Keys)patch.Patch(m,postfix:new HarmonyMethod(typeof(FishingNetwork),nameof(Response)));patch.Patch((MethodInfo)FishingBindings.Api("Inventory.UnlockReply"),postfix:new HarmonyMethod(typeof(FishingNetwork),nameof(UnlockResponse)));patch.Patch(SendMethod(),prefix:new HarmonyMethod(typeof(FishingNetwork),nameof(Sent)));}
             catch {Dispose();throw;}
         }
         private static void Sent(object __0)
         {
             var c=current;if(c==null || __0==null)return;var name=__0.GetType().Name;
             if(!name.EndsWith("Request",StringComparison.Ordinal))return;var kind=name.Substring(0,name.Length-7);
-            if(!c.handlers.Values.Contains(kind))return;
+            if(!c.handlers.Values.Contains(kind) && kind!="FishingFishLock")return;
             lock(c.sync){if(!c.pending.TryGetValue(kind,out var q))c.pending[kind]=q=new Queue<DateTime>();q.Enqueue(DateTime.UtcNow);c.last=kind+" 等待响应";c.events.Enqueue(c.last);}
         }
         private static void Response(byte[] __0,int __1,int __2,bool __result,MethodBase __originalMethod)
@@ -68,10 +69,27 @@ namespace BD2Fishing.Runtime
                 s.NetworkPending=dates.Length>0;s.NetworkWaitSeconds=dates.Length==0?0:(DateTime.UtcNow-dates.Min()).TotalSeconds;
                 s.SaleReplySerial=saleReplySerial;s.SaleReplyAccepted=saleReplyAccepted;
                 s.BaitReplySerial=baitReplySerial;s.BaitReplyAccepted=baitReplyAccepted;
+                s.UnlockReplySerial=unlockReplySerial;s.UnlockReplyIndex=unlockReplyIndex;s.UnlockReplyAccepted=unlockReplyAccepted;
                 s.Network=last;s.Catches=catches;if(error.Length>0)s.Error=error;
             }
         }
         internal void AcknowledgeError(){lock(sync){error="";}}
+        // The game's empty lock response does not call a protobuf parser. Observe its
+        // verified common handler AFTER it has updated the native inventory.
+        private static void UnlockResponse(FishingFishLockRequest __0,int __3,bool __result)
+        {
+            var c=current;if(c==null)return;
+            lock(c.sync)
+            {
+                if(c.pending.TryGetValue("FishingFishLock",out var q) && q.Count>0)q.Dequeue();
+                c.unlockReplySerial++;
+                c.unlockReplyIndex=__0!=null && __0.FishLockInfo.Count==1?__0.FishLockInfo[0].InvenIndex:0;
+                c.unlockReplyAccepted=__3==0 && __result && c.unlockReplyIndex>0 && !__0.FishLockInfo[0].IsLock;
+                c.last="FishingFishLock error="+__3+" accepted="+__result;
+                if(__3!=0 || !__result)c.error=c.last;
+                c.events.Enqueue(c.last);
+            }
+        }
         internal void Flush(){string[] list;lock(sync){list=events.ToArray();events.Clear();}foreach(var e in list)LocalStorage.Log("network "+e);}
         public void Dispose(){current=null;patch.UnpatchAll("bd2.fishing.network");}
     }

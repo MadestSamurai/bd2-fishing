@@ -28,7 +28,7 @@ foreach($flavor in @('Portable','Lite')){
     $identityPath=Join-Path $check 'identity.json'
     RunCheck @('--identity',('"'+$identityPath+'"'))
     $identity=Get-Content $identityPath -Raw | ConvertFrom-Json
-    if($identity.runtime -ne 'BD2Fishing.Runtime9' -or $identity.compatibility -ne 'local-interface-adaptation' -or $identity.defaultNextCastMs -ne 1000){throw 'Embedded identity differs from release'}
+    if($identity.runtime -ne 'BD2Fishing.Runtime10' -or $identity.compatibility -ne 'local-interface-adaptation' -or $identity.defaultNextCastMs -ne 1000){throw 'Embedded identity differs from release'}
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'results.json') -Raw | ConvertFrom-Json
     if($ui.status -ne 'pass'){throw 'Packaged UI regression failed'}
@@ -44,7 +44,7 @@ foreach($flavor in @('Portable','Lite')){
     $bundle=Join-Path $work $name;New-Item -ItemType Directory -Path $bundle | Out-Null
     Copy-Item -LiteralPath $exe -Destination $exePath
     Copy-Item -LiteralPath $exe -Destination (Join-Path $bundle "$name.exe")
-    foreach($file in @('README.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
+    foreach($file in @('README.md','README.en.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses') -Destination $bundle -Recurse
     Compress-Archive -LiteralPath $bundle -DestinationPath $zipPath -CompressionLevel Optimal
     $assets+=@($exePath,$zipPath)
@@ -52,7 +52,7 @@ foreach($flavor in @('Portable','Lite')){
 }
 if($flavors[1].exeBytes -ge $flavors[0].exeBytes){throw 'Lite must be smaller than Portable'}
 @(foreach($file in $assets){"$((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"}) | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
-[ordered]@{version=$Version;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;gameLibrariesBundled=$false;clientVersionLock=$false;runtimeVerification='source_implemented_pending_runtime'} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
+[ordered]@{version=$Version;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;languages=@('zh-CN','en-US');gameLibrariesBundled=$false;clientVersionLock=$false;runtimeVerification='source_implemented_pending_runtime'} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 $repoRoot=[IO.Path]::GetFullPath($PSScriptRoot)+[IO.Path]::DirectorySeparatorChar
 if(!([IO.Path]::GetFullPath($output)).StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase) -or !$destination.StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase)){throw 'Output paths outside repository'}
 New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null

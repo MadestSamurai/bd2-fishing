@@ -13,8 +13,12 @@ public sealed class FishingSettings
  public double CastGauge {get;set;}=.9;
  public bool PreferWeak {get;set;}=true;
  public bool AutoSell {get;set;}=true;
- public bool KeepLockedOnly {get;set;}
  public bool AutoApproach {get;set;}=true;
+ // One-way migration from 0.3.2; new writes only use independent retention rules.
+ [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+ public bool? KeepLockedOnly {get;set;}
+ private FishingRetentionOptions? retention;
+ public FishingRetentionOptions Retention {get=>retention??=new(){KeepLegendary=KeepLockedOnly!=true};set=>retention=value;}
  public bool AutoBait {get;set;}=true;
  public bool AutoMapRenewal {get;set;}=true;
 }
@@ -29,7 +33,8 @@ public sealed class FishingControlLink:IDisposable
  public void Configure(FishingSettings s)
  {
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))throw new ArgumentException("下一竿间隔为 0–60000 毫秒，蓄力为 5–95%。");
-  lock(sync){command.NextCastMilliseconds=s.NextCastMilliseconds;command.CastGauge=s.CastGauge;command.PreferWeak=s.PreferWeak;command.AutoSell=s.AutoSell;command.KeepLockedOnly=s.KeepLockedOnly;command.AutoApproach=s.AutoApproach;command.AutoBait=s.AutoBait;command.AutoMapRenewal=s.AutoMapRenewal;FishingJson.Write(Path.Combine(root,"settings.json"),s);if(command.Enabled)Write();}
+  var retention=(s.Retention??new()).Clone();
+  lock(sync){FishingJson.Write(Path.Combine(root,"settings.json"),s);command.NextCastMilliseconds=s.NextCastMilliseconds;command.CastGauge=s.CastGauge;command.PreferWeak=s.PreferWeak;command.AutoSell=s.AutoSell;command.Retention=retention;command.AutoApproach=s.AutoApproach;command.AutoBait=s.AutoBait;command.AutoMapRenewal=s.AutoMapRenewal;if(command.Enabled)Write();}
  }
  public void Start(int pid){lock(sync){if(disposed)throw new ObjectDisposedException(nameof(FishingControlLink));command.OwnerId=Guid.NewGuid().ToString("N");command.ProcessId=pid;command.Enabled=true;try{Write();}catch{command.Enabled=false;throw;}}}
  public void Stop(){lock(sync){command.Enabled=false;Write();}}

@@ -54,6 +54,9 @@ public static class ContractGenerator
         Api("Tables.Shop",tables,"ὤὠὡὭὩὥὥὥὦὨὧ",1);Api("Tables.ShopEntries",tables,"ὧὮὮὤὠὨὩὣὢὪὦ",1);
         Api("Tables.Fish",tables,"ὦὮὩὣὥὡὨὪὤὠὤ",1);Api("Tables.Bait",tables,"ὠὫὯὬὡὮὦὣὨὧὭ",1);Api("Tables.Buff",tables,"ὣὪὯὧὦὮὡὥὣὫὬ",1);
         Api("Inventory.FishList",inventory,"ὡὬὠὨὫὦὥὪὡὮὣ",0);Api("Inventory.Sell",inventory,"ὫὡὮὫὢὭὢὡὣὭὫ",3);
+        Api("Inventory.Unlock",inventory,"ὫὪὠὥὨὡὫὨὤὩὯ",3);
+        Api("Inventory.UnlockReply",inventory,"ὪὬὫὭὣὬὭὦὬὧὫ",5);
+        Api("Text.FishName","ὨὣὡὪὨὬὡὭὭὬὬ","ὥὢὮὣὮὠὦὧὫὡὥ",1);
         Api("Inventory.BaitList",inventory,"ὣὣὪὪὧὫὥὡὮὣὨ",0);Api("Inventory.BaitCount",inventory,"ὩὪὧὬὥὪὠὣὥὥὯ",2);
         Api("Inventory.FindBait",inventory,"ὬὧὩὢὡὤὮὦὠὫὯ",2);Api("Inventory.BaitByIndex",inventory,"ὬὧὩὢὡὤὮὦὠὫὯ",1);
         Api("Ui.IsHud","ὨὧὠὯὪὦὩὣὤὢὡ","ὩὠὮὥὫὧὢὣὯὯὫ",1);

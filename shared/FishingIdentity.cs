@@ -3,7 +3,7 @@ namespace BD2Fishing
 {
     public static partial class FishingIdentity
     {
-        public const string RuntimeName = "BD2Fishing.Runtime9";
+        public const string RuntimeName = "BD2Fishing.Runtime10";
         public static string DataRoot => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BD2Fishing");
         public static bool IsGameProcessName(string name) => string.Equals(name,"BrownDust II",StringComparison.OrdinalIgnoreCase) || string.Equals(name,"BrownDust II.exe",StringComparison.OrdinalIgnoreCase);
     }
@@ -25,7 +25,7 @@ namespace BD2Fishing
         public double CastGauge {get;set;} = 0.9;
         public bool PreferWeak {get;set;} = true;
         public bool AutoSell {get;set;}
-        public bool KeepLockedOnly {get;set;}
+        public FishingRetentionOptions Retention {get;set;} = new FishingRetentionOptions();
         public bool AutoApproach {get;set;}
         public bool AutoBait {get;set;}
         public bool AutoMapRenewal {get;set;}
@@ -53,6 +53,11 @@ namespace BD2Fishing
         public string SaleStatus {get;set;} = "尚未自动出售";
         public long SaleReplySerial {get;set;}
         public bool SaleReplyAccepted {get;set;}
+        public long UnlockReplySerial {get;set;}
+        public long UnlockReplyIndex {get;set;}
+        public bool UnlockReplyAccepted {get;set;}
+        public int UnlockedCount {get;set;}
+        public FishingSpeciesSummary[] FishSpecies {get;set;} = new FishingSpeciesSummary[0];
         public bool BaitReady {get;set;}
         public bool BaitCanUse {get;set;}
         public int BaitCount {get;set;}
