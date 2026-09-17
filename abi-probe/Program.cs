@@ -5,7 +5,7 @@ var managed=Path.GetFullPath(args[0]);var hookPath=Path.GetFullPath(args[1]);Ass
 AppDomain.CurrentDomain.AssemblyResolve+=(_,e)=>{var name=new AssemblyName(e.Name).Name;if(name=="0Harmony"&&hook!=null){using var s=hook.GetManifestResourceStream("BD2Fishing.Harmony.dll")!;using var b=new MemoryStream();s.CopyTo(b);return Assembly.Load(b.ToArray());}var file=Path.Combine(managed,name+".dll");return File.Exists(file)?Assembly.LoadFrom(file):null;};
 hook=Assembly.LoadFrom(hookPath);var types=hook.GetTypes();int assertions=0;
 void Check(bool ok,string message){assertions++;if(!ok)throw new Exception(message);}
-Check(hook.GetName().Name=="BD2Fishing.Runtime7","identity");
+Check(hook.GetName().Name=="BD2Fishing.Runtime9","identity");
 Check(!types.Any(t=>new[]{"Sichuan","Watcher","Golden","Mirror","ReplayCapture"}.Any(n=>(t.FullName??"").Contains(n))),"unrelated type closure");
 var identity=hook.GetType("BD2Fishing.FishingIdentity")!;var game=Assembly.LoadFrom(Path.Combine(managed,"Assembly-CSharp.dll"));
 var flags=BindingFlags.Static|BindingFlags.NonPublic;
@@ -79,13 +79,25 @@ var fishType=hook.GetType("BD2Fishing.FishingSaleItem")!;
 var fish=Activator.CreateInstance(fishType)!;
 foreach(var v in new Dictionary<string,object>{{"InvenIndex",9123456789L},{"FishId",123},{"Grade",2},{"HasFishTable",true},{"HasSaleEntry",true}})fishType.GetProperty(v.Key)!.SetValue(fish,v.Value);
 var samples=Array.CreateInstance(fishType,1);samples.SetValue(fish,0);
-var salePlan=hook.GetType("BD2Fishing.FishingSalePlan")!.GetMethod("Build")!.Invoke(null,new object[]{samples})!;
+var salePlan=hook.GetType("BD2Fishing.FishingSalePlan")!.GetMethod("Build")!.Invoke(null,new object[]{samples,false})!;
 var items=(System.Collections.IList)inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{salePlan})!;
 var item=items[0]!;object Val(string n)=>((PropertyInfo)Member(item.GetType(),n)).GetValue(item)!;
 Check(items.Count==1 && Convert.ToInt32(Val("ὢὯὧὤὮὭὮὣὭὪὣ"))==123 && Convert.ToInt64(Val("ὠὬὩὥὥὨὠὭὩὬὬ"))==9123456789L && Convert.ToInt32(Val("ὬὯὭὩὡὮὩὨὢὭὣ"))==56 && Convert.ToInt32(Val("ὬὯὫὯὮὠὡὪὤὣὬ"))==1,"normal sale DTO preserves concrete inventory ID, fish type and quantity");
 fishType.GetProperty("Grade")!.SetValue(fish,4);
 bool protectedRejected=false;try{inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{salePlan});}catch(TargetInvocationException e)when(e.InnerException is InvalidOperationException){protectedRejected=true;}
 Check(protectedRejected,"runtime request builder rechecks protected grade");
+var unrestricted=hook.GetType("BD2Fishing.FishingSalePlan")!.GetMethod("Build")!.Invoke(null,new object[]{samples,true})!;
+Check(((System.Collections.IList)inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{unrestricted})!).Count==1,"locked-only builds native legendary sale DTO");
+fishType.GetProperty("IsLocked")!.SetValue(fish,true);protectedRejected=false;try{inventoryType.GetMethod("RequestItems",flags)!.Invoke(null,new[]{unrestricted});}catch(TargetInvocationException e)when(e.InnerException is InvalidOperationException){protectedRejected=true;}Check(protectedRejected,"locked-only native DTO refuses newly locked fish");
+Check(Member(managerType,"ὫὨὥὣὫὪὨὥὪὡὣ") is FieldInfo areaField&&areaField.FieldType.GetElementType()!.FullName=="gamfs.Fishing.FishingCastingArea","casting areas scoped to active fishing boat");
+Check(bindings.GetMethod("Api",flags)!.Invoke(null,new object[]{"Field.Instance"}) is PropertyInfo,"field singleton resolves");
+Check(((MethodInfo)Member(game.GetType("PlayerMoveController")!,"SetMoveNav")).GetParameters().Length==3,"native path takes complete-path requirement");
+Check(Enum.GetNames(Role("MoveKind")).Contains("Navigation"),"movement mode enum resolves across clients");
+Check(Enum.GetNames(Role("MoveKind")).Contains("CharController"),"native collision movement mode resolves across clients");
+Check(((PropertyInfo)Member(game.GetType("MoveController")!,"ὫὬὤὪὠὧὨὩὬὬὩ")).PropertyType.FullName=="UnityEngine.CharacterController","native character controller getter resolves");
+Check(((MethodInfo)Member(managerType,"IsFacingOutwards")).ReturnType==typeof(bool),"native outward-facing check");
+Check(((PropertyInfo)Member(managerType,"ὪὪὯὪὪὡὠὬὣὭὥ")).PropertyType.FullName=="gamfs.Fishing.FishingObjectBoat","outward direction uses current fishing boat");
+
 var baitType=hook.GetType("BD2Fishing.Runtime.FishingBait")!;
 var useMethod=(MethodInfo)baitType.GetMethod("UseMethod",flags)!.Invoke(null,null)!;
 Check(useMethod.ReturnType==typeof(void) && useMethod.GetParameters()[3].HasDefaultValue && (int)useMethod.GetParameters()[3].DefaultValue! == 1,"native bait use quantity defaults to one");

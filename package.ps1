@@ -1,4 +1,4 @@
-﻿param([string]$Version='', [switch]$Locked)
+param([string]$Version='', [switch]$Locked)
 $ErrorActionPreference='Stop'
 $declared=([xml](Get-Content (Join-Path $PSScriptRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if(!$Version){$Version=$declared}
@@ -28,7 +28,7 @@ foreach($flavor in @('Portable','Lite')){
     $identityPath=Join-Path $check 'identity.json'
     RunCheck @('--identity',('"'+$identityPath+'"'))
     $identity=Get-Content $identityPath -Raw | ConvertFrom-Json
-    if($identity.runtime -ne 'BD2Fishing.Runtime7' -or $identity.compatibility -ne 'local-interface-adaptation' -or $identity.defaultNextCastMs -ne 1000){throw 'Embedded identity differs from release'}
+    if($identity.runtime -ne 'BD2Fishing.Runtime9' -or $identity.compatibility -ne 'local-interface-adaptation' -or $identity.defaultNextCastMs -ne 1000){throw 'Embedded identity differs from release'}
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'results.json') -Raw | ConvertFrom-Json
     if($ui.status -ne 'pass'){throw 'Packaged UI regression failed'}

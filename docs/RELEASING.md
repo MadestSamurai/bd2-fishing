@@ -21,23 +21,24 @@
 
 ```powershell
 # 不注入、不连接服务器，只检查元数据并编译内存组件。
-BD2Fishing-0.3.0-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
+BD2Fishing-0.3.2-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
 ```
 
 维护者的详细检查：
 
 ```powershell
 dotnet run --project compatibility-cli -c Release -- check "C:\YourGame\BrownDust II_Data\Managed" .build/client-check
-dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime7.dll
+dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime9.dll
 ```
 
 - [ ] 验证原生 UI 按下／松开、提竿、收线、长按入口。
 - [ ] 验证状态名、血量／计时、针与判定区、特殊鱼技能。
 - [ ] 验证排队切图与实际切图两个标志仍独立，结算可正常关闭。
-- [ ] 验证游戏时钟、RoomDuration、入场时间、地图加载协程和解锁判断；先收获再去大厅，返程须确认新时间与可抛竿状态。
+- [ ] 验证游戏时钟、RoomDuration、入场时间、地图加载协程和解锁判断；先收获再去大厅，返程先确认新时间，随后通过自动靠近钓区恢复可抛竿状态。
 - [ ] 验证手动切图、关停、关闭往返开关、加载超时和过期时正逢昼夜切换，不重复发送切图。
 - [ ] 验证六类原始回执仍唯一；不替换回调、不自行构造重发请求。
-- [ ] 验证稀有度、锁定鱼、出售 DTO 和背包回读。
+- [ ] 验证稀有度、锁定鱼、出售 DTO 和背包回读；两种保留策略均需发送前重新核对锁定状态。
+- [ ] 验证缺失／禁用／离开导航网格时的原生角色行走、到位转向与抛竿；停止或切图应释放工具所拥有的移动。
 - [ ] 验证鱼饵表、具体库存、使用数量、增益和回执。
 - [ ] 验证停止、租约失效、关闭窗口与模块冲突处理。
 

@@ -29,7 +29,7 @@ public static class HookCompiler
         foreach(var file in Directory.EnumerateFiles(managed,"*.dll").OrderBy(x=>x,StringComparer.Ordinal))
         {try{refs.Add(MetadataReference.CreateFromFile(file));}catch(BadImageFormatException){}}
         refs.Add(MetadataReference.CreateFromImage(Resource("BD2Fishing.Harmony.dll")));
-        var compilation=CSharpCompilation.Create("BD2Fishing.Runtime7",sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
+        var compilation=CSharpCompilation.Create("BD2Fishing.Runtime9",sources,refs,new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,platform:Platform.X64,deterministic:true));
         using var stream=new MemoryStream();
         var emit=compilation.Emit(stream,manifestResources:new[]{new ResourceDescription("BD2Fishing.Harmony.dll",()=>new MemoryStream(Resource("BD2Fishing.Harmony.dll")),true)});
         if(!emit.Success)throw new InvalidOperationException("当前客户端接口无法编译，尚未注入。\n"+string.Join("\n",emit.Diagnostics.Where(d=>d.Severity==DiagnosticSeverity.Error).Take(30)));

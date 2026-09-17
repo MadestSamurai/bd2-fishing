@@ -48,7 +48,12 @@ namespace BD2Fishing.Runtime
             int count=0;var game=typeof(FishingGameFieldDefaultUI).Assembly;
             foreach(var pair in new Dictionary<string,string[]>{
                 {"FishingGameFieldDefaultUI",new[]{"ὢὨὠὩὤὬὠὧὬὠὬ","_castingCharger","_baitInfo","_skillCaster","_hitzonePicker","_goBtnHook","_goBtnFight","_rectHitzoneNormal","_rectHitzoneWeak","ὬὣὦὫὬὯὧὮὣὣὡ","ὣὥὪὥὫὬὬὮὦὭὩ","ὯὦὦὯὤὪὡὮὢὫὮ"}},
-                {"gamfs.Fishing.FishingManager",new[]{"ὮὧὥὥὦὬὤὭὤὡὪ","ὧὠὤὦὠὡὠὪὪὢὠ","ὯὥὬὦὤὬὡὤὡὡὨ","ὢὣὢὬὣὧὣὫὭὤὬ","ὨὥὯὤὪὣὬὪὤὬὬ","UseItem","HasBuff","ὥὬὪὥὠὣὪὡὢὥὮ","ὭὡὧὡὢὡὬὬὧὥὯ","ὢὪὠὠὩὪὧὧὭὨὬ","ὡὣὧὫὦὯὧὤὧὦὬ","ὣὤὣὬὪὡὥὨὪὫὤ","EnterPackFishing"}},
+                {"gamfs.Fishing.FishingManager",new[]{"ὮὧὥὥὦὬὤὭὤὡὪ","ὧὠὤὦὠὡὠὪὪὢὠ","ὯὥὬὦὤὬὡὤὡὡὨ","ὢὣὢὬὣὧὣὫὭὤὬ","ὨὥὯὤὪὣὬὪὤὬὬ","UseItem","HasBuff","ὥὬὪὥὠὣὪὡὢὥὮ","ὭὡὧὡὢὡὬὬὧὥὯ","ὢὪὠὠὩὪὧὧὭὨὬ","ὡὣὧὫὦὯὧὤὧὦὬ","ὣὤὣὬὪὡὥὨὪὫὤ","EnterPackFishing","ὫὨὥὣὫὪὨὥὪὡὣ","ὪὪὯὪὪὡὠὬὣὭὥ","IsFacingOutwards"}},
+                {"GameFieldManager",new[]{"ὪὨὦὬὡὬὠὧὥὪὭ","ὬὪὧὦὭὬὪὧὣὣὫ"}},
+                {"PlayerController",new[]{"ὥὠὬὪὨὯὭὬὡὡὣ","SetMoveStart","SetRotationForce"}},
+                {"PlayerMoveController",new[]{"ChangeMoveType","SetMoveNav","ClearMove","StopMove","SetNavStop"}},
+                {"MoveController",new[]{"ὫὬὤὪὠὧὨὩὬὬὩ","ὦὣὠὨὣὨὡὯὪὢὦ","ὭὠὢὩὫὤὥὬὧὡὢ","ὠὤὣὫὮὢὬὨὫὢὡ"}},
+                {"gamfs.Fishing.FishingCastingArea",new[]{"diameter","height"}},
                 {"FishingBaitInfoItem",new[]{"ὩὯὪὩὯὫὮὤὭὧὢ"}},
                 {"gamfs.Fishing.FishingTimerHub",new[]{"IsRunning","GetRemaining"}},
                 {"FishingCastingCharger",new[]{"ὩὯὪὩὯὫὮὤὭὧὢ","ὩὡὣὢὬὦὥὧὥὭὦ","GetNormalizeValue"}},

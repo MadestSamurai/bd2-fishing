@@ -19,6 +19,12 @@ public partial class FishingWindow
   CastBox.Text="99";SettingsChanged(this,new RoutedEventArgs());Check(SettingsHint.Foreground==Brushes.Firebrick,"invalid gauge shown");CastBox.Text="90";
   IntervalBox.Text="500";SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.NextCastMilliseconds==500,"live settings saved");
   Check(c.AutoSell,"enabled sale included in lease");
+  Check(!c.KeepLockedOnly&&c.AutoApproach,"safe retained-fish default and enabled approach lease");
+  OnlyLockedBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.KeepLockedOnly,"locked-only selection reaches live control");
+  Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.KeepLockedOnly,"locked-only selection persists");
+  AutoApproachBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoApproach,"approach can be disabled immediately");
+  AutoApproachBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoApproach,"approach choice persists");
+
   AutoSellBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoSell,"sale can be disabled live");
   AutoSellBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoSell,"sale preference persisted");
   Check(c.AutoMapRenewal,"map renewal included in lease");

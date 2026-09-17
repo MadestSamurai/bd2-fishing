@@ -19,6 +19,7 @@ namespace BD2Fishing.Runtime
         private readonly FishingNetwork network=new FishingNetwork();
         private FishingInventory inventory;
         private FishingBait bait;
+        private FishingNavigation navigation;
         private readonly System.Collections.Concurrent.ConcurrentQueue<string> diagnostics=new System.Collections.Concurrent.ConcurrentQueue<string>();
         private readonly HashSet<int> consumed=new HashSet<int>();
         private Timer timer;private int ioBusy;private bool stopped;
@@ -35,7 +36,7 @@ namespace BD2Fishing.Runtime
         {
             if(timer!=null)return;
             FishingBindings.ValidateCompiledClient();
-            FishingBindings.Validate();FishingInventory.SaleMethod();inventory=new FishingInventory(LogDiagnostic);FishingBait.UseMethod();bait=new FishingBait(LogDiagnostic);network.Start();current=this;
+            FishingBindings.Validate();FishingInventory.SaleMethod();inventory=new FishingInventory(LogDiagnostic);FishingBait.UseMethod();bait=new FishingBait(LogDiagnostic);navigation=new FishingNavigation(LogDiagnostic);network.Start();current=this;
             try
             {
                 patch.Patch(Pump(),postfix:new HarmonyMethod(typeof(RuntimeEngine),nameof(Frame)));
@@ -83,12 +84,14 @@ namespace BD2Fishing.Runtime
                 if(holdPhase && (ui==null || !ReferenceEquals(FishingBindings.Get(FishingBindings.Get(ui,"_skillCaster"),"_holdItem"),hold)))return;
                 var s=Read(now);var c=control??new FishingControl();
                 if(c.Valid(now,pid) && observedOwner!=c.OwnerId){observedOwner=c.OwnerId;network.AcknowledgeError();inventory.AcknowledgeError();bait.AcknowledgeError();}
-                network.Fill(s);inventory.Fill(s,now);bait.Fill(ui,s,now);
+                network.Fill(s);inventory.Fill(s,now,c.KeepLockedOnly);bait.Fill(ui,s,now);
+                if(!holdPhase)navigation.Reconcile(s,c,now,policy.Fault.Length>0);
                 var action=policy.Next(s,c,now,holdPhase);
                 if(action!=FishingAction.None)Apply(action,s);
                 s.Enabled=c.Valid(now,pid) && policy.Fault.Length==0;
                 if(holdPhase){s.MapRenewalStatus=policy.MapRenewalStatus;s.MapRenewals=policy.MapRenewals;}
-                s.OwnerId=c.OwnerId;s.Reason=policy.Reason;s.LastAction=lastAction;s.ActionCount=actionCount;
+                s.ApproachStatus=navigation.Status;
+                s.OwnerId=c.OwnerId;s.Reason=action==FishingAction.ApproachWater&&navigation.Status.Length>0?navigation.Status:policy.Reason;s.LastAction=lastAction;s.ActionCount=actionCount;
                 if(s.Enabled && s.MapChangePending && !s.Busy && s.State!="None")s.Reason+="；昼夜切换排队，先完成本竿";
                 if(policy.Fault.Length>0)s.Error=policy.Fault;
                 latest=s;
@@ -96,7 +99,7 @@ namespace BD2Fishing.Runtime
             catch(Exception e)
             {
                 var error=e.GetBaseException().Message;policy.Fail(error);
-                try{ReleaseHold();}catch{}
+                try{ReleaseHold();navigation?.Stop();}catch{}
                 latest=new FishingSnapshot{ProcessId=pid,CapturedUtcTicks=DateTime.UtcNow.Ticks,OwnerId=control?.OwnerId??"",Error=error,Reason="钓鱼已暂停："+error};
             }
         }
@@ -183,16 +186,19 @@ namespace BD2Fishing.Runtime
                         throw new InvalidOperationException("换图入口未就绪，已暂停");
                     var targetMap=action==FishingAction.TravelLobby?0:policy.ReturnMapGroupId;
                     LogDiagnostic("map_renewal from="+s.MapGroupId+" to="+targetMap+" start="+s.RoomStartTicks+" remaining="+s.RoomRemainingSeconds);
-                    FishingMap.Travel(mapManager,targetMap);break;
+                    navigation.Stop();FishingMap.Travel(mapManager,targetMap);break;
                 case FishingAction.SellFish:
                     var c=control;
                     if(c==null || !c.Valid(DateTime.UtcNow.Ticks,pid) || !c.AutoSell || !s.Ready || s.State!="None" || !s.BagFull || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
-                    if(!inventory.Sell(DateTime.UtcNow.Ticks,s.SaleReplySerial))return;
+                    if(!inventory.Sell(DateTime.UtcNow.Ticks,s.SaleReplySerial,c.KeepLockedOnly))return;
                     break;
                 case FishingAction.UseBait:
                     var baitControl=control;
                     if(baitControl==null || !baitControl.Valid(DateTime.UtcNow.Ticks,pid) || !baitControl.AutoBait || !s.Ready || s.State!="None" || s.BagFull || !s.CanCast || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
                     if(!bait.Use(ui,DateTime.UtcNow.Ticks,s.BaitReplySerial))return;
+                    break;
+                case FishingAction.ApproachWater:
+                    if(!navigation.Approach(mapManager,s,control,DateTime.UtcNow.Ticks))return;
                     break;
                 case FishingAction.CastPress: FishingBindings.Call(ui,"ὣὥὪὥὫὬὬὮὦὭὩ");break;
                 case FishingAction.CastRelease: if(ui!=null)FishingBindings.Call(ui,"ὯὦὦὯὤὪὡὮὢὫὮ");break;
@@ -210,6 +216,6 @@ namespace BD2Fishing.Runtime
         }
         private void LogDiagnostic(string message){if(diagnostics.Count<256)diagnostics.Enqueue(message);}
         private void ReleaseHold(){if(ownedHold!=null)ownedHold.OnPointerUp(null);ownedHold=null;}
-        internal void Stop(){stopped=true;current=null;timer?.Dispose();timer=null;patch.UnpatchAll("bd2.fishing.inputs");network.Dispose();}
+        internal void Stop(){navigation?.Stop();stopped=true;current=null;timer?.Dispose();timer=null;patch.UnpatchAll("bd2.fishing.inputs");network.Dispose();}
     }
 }

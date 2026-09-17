@@ -41,8 +41,8 @@ namespace BD2Fishing
                     stage=2;sentAt=now;action=FishingAction.TravelReturn;
                     return Finish(s,true);
                 }
-                Status="正在返回原钓场，等待新的入场时间和可钓状态";
-                if(!clear || !s.Ready || s.State!="None" || !s.CanCast || s.MapGroupId!=OriginalMap ||
+                Status="正在返回原钓场，等待新的入场时间";
+                if(!clear || !s.Ready || s.State!="None" || s.MapGroupId!=OriginalMap ||
                     !s.RoomTimerKnown || s.RoomStartTicks<=originalStart || s.RoomRemainingSeconds<=LeadSeconds(s.RoomDurationSeconds))return Finish(s,true);
                 completed++;stage=0;Status="往返换图完成，新的地图倒计时已确认";
                 return Finish(s,true); // Resume through the normal cast policy on the next frame.

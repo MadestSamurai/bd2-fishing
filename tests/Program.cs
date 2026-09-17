@@ -193,8 +193,8 @@ mapTime+=TimeSpan.FromSeconds(3).Ticks;Check(renewal.Next(ms,MapControl(),mapTim
 ms.MapTravelBusy=false;ms.LobbyReady=true;renewal.Next(ms,MapControl(),mapTime,out ma);
 mapTime+=TimeSpan.FromSeconds(2).Ticks;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.TravelReturn&&renewal.OriginalMap==3,"return once after stable lobby even without field UI");
 ms=MapSample();Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"old room timestamp must not mark success");
-ms.RoomStartTicks++;ms.RoomRemainingSeconds=21600;ms.CanCast=false;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==0,"wait native fishing position");
-ms.CanCast=true;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==1,"confirm new room and casting readiness");
+ms.RoomStartTicks++;ms.RoomRemainingSeconds=21600;ms.CanCast=false;Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==1,"new room completes renewal even when spawn is away from water");
+ms.CanCast=true;Check(!renewal.Next(ms,MapControl(),mapTime,out ma)&&ms.MapRenewals==1,"confirmed new room does not travel again");
 Check(!renewal.Next(ms,MapControl(),mapTime,out ma)&&ma==FishingAction.None,"normal fishing resumes without immediate repeat");
 renewal=new();ms=MapSample();renewal.Next(ms,MapControl(),mapTime,out ma);mapTime+=TimeSpan.FromSeconds(121).Ticks;
 Check(renewal.Next(ms,MapControl(),mapTime,out ma)&&renewal.Fault.Length>0&&ma==FishingAction.None,"travel timeout never retries blindly");
@@ -212,4 +212,42 @@ Check(p.Next(ms,MapControl(),mapTime)==FishingAction.ClosePopup,"due map closes 
 mapTime+=TimeSpan.FromMilliseconds(100).Ticks;ms.State="None";ms.ResultPopup=false;
 Check(p.Next(ms,MapControl(),mapTime)==FishingAction.TravelLobby,"travel precedes new cast and consumables");
 Check(p.Next(ms,new FishingControl(),mapTime)==FishingAction.None,"stop revokes pending map travel");
+// End-to-end policy handoff: renewed room away from the water reaches approach and then normal casting.
+p=new();ms=MapSample();var returnControl=MapControl();returnControl.AutoApproach=true;
+Check(p.Next(ms,returnControl,mapTime)==FishingAction.TravelLobby,"approach flow leaves expired room");
+ms.MapGroupId=0;ms.LobbyReady=true;ms.Ready=false;mapTime+=TimeSpan.FromSeconds(1).Ticks;returnControl.UntilUtcTicks=mapTime+TimeSpan.FromSeconds(10).Ticks;p.Next(ms,returnControl,mapTime);
+mapTime+=TimeSpan.FromSeconds(2).Ticks;returnControl.UntilUtcTicks=mapTime+TimeSpan.FromSeconds(10).Ticks;Check(p.Next(ms,returnControl,mapTime)==FishingAction.TravelReturn,"approach flow returns to original room");
+ms=MapSample();ms.RoomStartTicks++;ms.RoomRemainingSeconds=21600;ms.CanCast=false;mapTime+=TimeSpan.FromSeconds(1).Ticks;returnControl.UntilUtcTicks=mapTime+TimeSpan.FromSeconds(10).Ticks;
+Check(p.Next(ms,returnControl,mapTime)==FishingAction.None&&p.MapRenewals==1,"room renewal finishes before shoreline positioning");
+mapTime+=TimeSpan.FromMilliseconds(100).Ticks;Check(p.Next(ms,returnControl,mapTime)==FishingAction.ApproachWater,"renewal hands off to approach without reentering map");
+ms.CanCast=true;mapTime+=TimeSpan.FromSeconds(2).Ticks;Check(p.Next(ms,returnControl,mapTime)==FishingAction.CastPress,"native casting readiness resumes ordinary fishing");
+// Locked-only selling permits known unlocked legendary fish, with every other protection retained.
+var lockedOnly=FishingSalePlan.Build(new[]{Fish(1,4),Fish(2,4,true),Fish(3,1),Fish(4,2),Fish(5,0),Fish(6,4,false,false),Fish(7,4,false,true,false)},true);
+Check(lockedOnly.KeepLockedOnly&&lockedOnly.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,3,4}),"locked-only sells known unlocked fish of all supported grades");
+Check(lockedOnly.KeepIds.SequenceEqual(new long[]{2,5,6,7}),"locked unknown and unlisted fish are retained");
+var lockedProgress=new FishingSaleProgress();lockedProgress.Begin(lockedOnly,time);lockedProgress.Observe(true,true,new long[]{2,5,6,7},time+1);Check(lockedProgress.SoldCount==3&&lockedProgress.Error=="","locked-only sale reconciles exact kept IDs");
+lockedOnly=FishingSalePlan.Build(new[]{Fish(1,4)},true);lockedOnly.Items[0].IsLocked=true;throws=false;try{new FishingSaleProgress().Begin(lockedOnly,time);}catch(InvalidOperationException){throws=true;}Check(throws,"new mode rechecks a lock added after planning");
+Check(!oldSettings.KeepLockedOnly&&oldSettings.AutoApproach,"older settings preserve legendary protection and enable approach");
+for(int seed=0;seed<50;seed++){
+ var rr=new Random(seed);var many=Enumerable.Range(1,180).Select(i=>Fish(i,new[]{0,1,2,3,4,5}[rr.Next(6)],rr.Next(3)==0,rr.Next(4)!=0,rr.Next(4)!=0)).ToArray();
+ var chosen=FishingSalePlan.Build(many,true);var selected=chosen.Items.Select(x=>x.InvenIndex).ToHashSet();
+ Check(chosen.Items.All(f=>!f.IsLocked&&f.HasFishTable&&f.HasSaleEntry&&(f.Grade==1||f.Grade==2||f.Grade==4)),"random locked-only protection");
+ Check(chosen.KeepIds.Length+chosen.Items.Length==many.Length&&chosen.KeepIds.All(id=>!selected.Contains(id)),"locked-only sale and retained IDs partition inventory");
+}
+// First entry and refreshed rooms both approach the casting area, with no action during a fight or popup.
+FishingSnapshot Away()=>new(){ProcessId=123,Ready=true,State="None",MapGroupId=3,CanCast=false};
+FishingControl Walk()=>new(){ProcessId=123,Enabled=true,OwnerId="walk",AutoApproach=true,UntilUtcTicks=time+TimeSpan.FromSeconds(10).Ticks};
+Check(new FishingPolicy().Next(Away(),Walk(),time)==FishingAction.ApproachWater,"away spawn requests native approach");
+foreach(var gate in new[]{"disabled","expired","otherPid","busy","travel","daynight","popup","level","network","sale","bait","error","fight","caught","auto","lobby","notReady","canCast","modal"}){
+ var a=Away();var cc=Walk();if(gate=="disabled")cc.AutoApproach=false;if(gate=="expired")cc.UntilUtcTicks=time-1;if(gate=="otherPid")cc.ProcessId++;
+ a.Busy=gate=="busy";a.MapTravelBusy=gate=="travel";a.MapChangePending=gate=="daynight";a.ResultPopup=gate=="popup";a.LevelPopup=gate=="level";a.NetworkPending=gate=="network";a.SalePending=gate=="sale";a.BaitPending=gate=="bait";a.Error=gate=="error"?"test":"";
+ if(gate=="fight")a.State="Fighting";if(gate=="caught")a.State="Caught";if(gate=="auto")a.State="Auto";if(gate=="lobby")a.MapGroupId=0;if(gate=="notReady")a.Ready=false;if(gate=="canCast")a.CanCast=true;if(gate=="modal")a.BlockReason="popup";
+ Check(!FishingApproach.CanRun(a,cc,time),"approach gate: "+gate);Check(new FishingPolicy().Next(a,cc,time)!=FishingAction.ApproachWater,"policy gate: "+gate);
+}
+var walking=new FishingApproach();walking.Begin(time,10);Check(walking.Observe(time+TimeSpan.FromSeconds(7).Ticks,10,false)==ApproachDecision.Continue,"do not repeatedly replace a moving route");
+Check(walking.Observe(time+TimeSpan.FromSeconds(8).Ticks,10,false)==ApproachDecision.Retry,"blocked route gets a bounded retry");walking.Begin(time,10);walking.Begin(time,10);Check(walking.Observe(time+TimeSpan.FromSeconds(8).Ticks,10,false)==ApproachDecision.Fail,"third blocked route stops");
+walking.Reset();walking.Begin(time,10);Check(walking.Observe(time+TimeSpan.FromSeconds(7).Ticks,5,false)==ApproachDecision.Continue&&walking.Observe(time+TimeSpan.FromSeconds(12).Ticks,4,false)==ApproachDecision.Continue,"progress refreshes stall deadline");
+Check(walking.Observe(time+TimeSpan.FromSeconds(91).Ticks,3,false)==ApproachDecision.Retry,"long route still has a deadline");
+walking.Reset();walking.Begin(time,0);Check(walking.Observe(time+TimeSpan.FromMilliseconds(500).Ticks,0,true)==ApproachDecision.Continue&&walking.Observe(time+TimeSpan.FromSeconds(1).Ticks,0,true)==ApproachDecision.Retry,"arrival waits for actual native casting permission");
+NavigationRegression.Run(Check);
 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{status="pass",assertions,gameRequests=0,injection=false}));

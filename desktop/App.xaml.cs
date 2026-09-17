@@ -10,7 +10,7 @@ public partial class App:Application
     {
         base.OnStartup(e);
         if(e.Args.Length==2&&e.Args[0]=="--identity")
-        {File.WriteAllText(e.Args[1],JsonSerializer.Serialize(new{runtime=FishingIdentity.RuntimeName,toolFingerprint=BD2Fishing.Compatibility.HookCompiler.ToolFingerprint,compatibility="local-interface-adaptation",version=typeof(App).Assembly.GetName().Version!.ToString(),defaultNextCastMs=1000,defaultCastGauge=0.9,defaultAutoSell=true,defaultAutoBait=true,defaultAutoMapRenewal=true,protectedLegendaryGrade=FishingSalePlan.LegendaryGrade}));Shutdown();return;}
+        {File.WriteAllText(e.Args[1],JsonSerializer.Serialize(new{runtime=FishingIdentity.RuntimeName,toolFingerprint=BD2Fishing.Compatibility.HookCompiler.ToolFingerprint,compatibility="local-interface-adaptation",version=typeof(App).Assembly.GetName().Version!.ToString(),defaultNextCastMs=1000,defaultCastGauge=0.9,defaultAutoSell=true,defaultKeepLockedOnly=false,defaultAutoApproach=true,defaultAutoBait=true,defaultAutoMapRenewal=true,protectedLegendaryGrade=FishingSalePlan.LegendaryGrade}));Shutdown();return;}
         if(e.Args.Length==3&&e.Args[0]=="--check-client")
         {
             try { var result=await Task.Run(()=>BD2Fishing.Compatibility.HookCompiler.Prepare(e.Args[1]));File.WriteAllText(e.Args[2],JsonSerializer.Serialize(result.Report));Shutdown(); }

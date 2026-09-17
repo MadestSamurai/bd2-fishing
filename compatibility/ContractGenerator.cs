@@ -40,6 +40,8 @@ public static class ContractGenerator
         foreach(var name in new[]{"FishingSkillTeethItem","FishingSkillRecoveryItem","FishingSkillTrapItem","FishingSkillShellShieldItem"})Select(name,"ὤὨὪὫὧὥὫὮὣὮὥ");
         foreach(var pair in new[]{new[]{"ὣὠὦὨὩὫὩὩὣὤὮ","ὦὬὢὢὮὩὨὨὠὠὯ"},new[]{"ὧὭὥὩὯὦὧὠὧὡὦ","ὩὤὮὠὠὥὪὢὩὯὡ"}})
         {var p=(PropertyDefinition)Select(pair[0],pair[1]).Single();Select(p.PropertyType.Resolve().FullName,"ὬὤὦὩὮὨὠὬὯὯὣ");}
+        Api("Field.Instance","GameFieldManager","ὪὨὦὬὡὬὠὧὥὪὭ");
+        Role("MoveKind","MoveController/ὯὥὮὢὯὨὯὧὬὩὯ");
         const string tables="ὥὧὣὭὠὬὣὡὬὫὯ", inventory="ὧὨὮὤὤὠὯὧὧὦὠ";
         Role("Inventory",inventory);Role("SaleItem","ὥὣὮὨὫὣὩὨὪὣὭ");Role("ItemType","ὪὡὢὦὢὡὯὩὫὤὥ");Role("FishGrade","ὥὡὯὭὫὨὯὧὡὯὤ/ὠὯὯὮὯὧὩὪὡὫὧ");
         Select(roles["SaleItem"],".ctor",4);
