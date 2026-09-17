@@ -28,7 +28,7 @@ BD2Fishing-0.4.0-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_D
 
 ```powershell
 dotnet run --project compatibility-cli -c Release -- check "C:\YourGame\BrownDust II_Data\Managed" .build/client-check
-dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime9.dll
+dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime10.dll
 ```
 
 - [ ] 验证原生 UI 按下／松开、提竿、收线、长按入口。
@@ -37,7 +37,7 @@ dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Mana
 - [ ] 验证游戏时钟、RoomDuration、入场时间、地图加载协程和解锁判断；先收获再去大厅，返程先确认新时间，随后通过自动靠近钓区恢复可抛竿状态。
 - [ ] 验证手动切图、关停、关闭往返开关、加载超时和过期时正逢昼夜切换，不重复发送切图。
 - [ ] 验证六类原始回执仍唯一；不替换回调、不自行构造重发请求。
-- [ ] 验证稀有度、锁定鱼、出售 DTO 和背包回读；两种保留策略均需发送前重新核对锁定状态。
+- [ ] 验证稀有度、独立保留规则、鱼种MAX／MIN、出售 DTO 和背包回读；发送前重新核对锁定状态。解锁须核对原始回执的完整64位鱼实例ID，并等待库存解锁后重新规划。
 - [ ] 验证缺失／禁用／离开导航网格时的原生角色行走、到位转向与抛竿；停止或切图应释放工具所拥有的移动。
 - [ ] 验证鱼饵表、具体库存、使用数量、增益和回执。
 - [ ] 验证停止、租约失效、关闭窗口与模块冲突处理。
@@ -49,3 +49,9 @@ dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Mana
 ## Languages
 
 Every Portable/Lite EXE includes Chinese and English. ZIPs include both README files. Release notes contain both language sections and a runtime comparison table. See [Localization](LOCALIZATION.md).
+
+## Recover an interrupted upload
+
+If the build succeeded but release uploads failed, run **Resume verified release** in GitHub Actions. Supply the existing tag and its build run ID. The workflow requires the build commit to match the tag, checks all artifact SHA256 values, retains matching uploaded assets, retries only missing or incomplete files, and publishes only when all six remote digests match. It refuses to replace differing assets in an already published release.
+
+This operation reuses the original build; do not move a published tag or rebuild binaries merely to recover a network interruption. If a retry still fails, the draft retains completed uploads for the next attempt.
