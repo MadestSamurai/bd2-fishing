@@ -21,7 +21,7 @@
 
 ```powershell
 # 不注入、不连接服务器，只检查元数据并编译内存组件。
-BD2Fishing-0.3.0-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
+BD2Fishing-0.3.1-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
 ```
 
 维护者的详细检查：

@@ -31,38 +31,39 @@ p=new();s=S("Fighting");s.HoldActive=true;s.HoldInside=true;s.HoldStartHit=true;
 var rng=new Random(73021);
 for(int i=0;i<1000;i++){p=new();s=S("BiteDetected");Check(Step(p,s)==FishingAction.Hook,"random bite accepted");for(int k=0;k<rng.Next(2,15);k++)Check(Step(p,s,rng.Next(81,501))==FishingAction.None,"jitter cannot repeat hook");}
 // Inventory selection and reply verification: protected by default, explicit opt-out.
-FishingSaleItem Fish(long id,int grade=1,bool locked=false,bool hasTable=true,bool listed=true)=>new(){InvenIndex=id,FishId=(int)id+1000,Grade=grade,IsLocked=locked,HasFishTable=hasTable,HasSaleEntry=listed};
+FishingSaleItem Fish(long id,int grade=1,bool locked=false,bool hasTable=true,bool listed=true)=>new(){InvenIndex=id,FishId=(int)id+1000,Grade=grade,IsLocked=locked,HasFishTable=hasTable,HasSaleEntry=listed,Size=20};
 var bag=new[]{Fish(1),Fish(2,2),Fish(3,4),Fish(4,4),Fish(5,1,true),Fish(6,3),Fish(7,0),Fish(8,2,false,false),Fish(9,2,false,true,false)};
 var plan=FishingSalePlan.Build(bag);
 Check(plan.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,2}),"only unlocked known normal and rare fish selected");
 Check(plan.Protected==7 && plan.KeepIds.Length==7,"all legendary copies and unknown fish retained");
-var unrestricted=FishingSalePlan.Build(bag,false);
-Check(unrestricted.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,2,3,4,5}),"opt-out includes legendary and locked fish but retains unknown grades and missing data");
-var unrestrictedProgress=new FishingSaleProgress();unrestrictedProgress.Begin(unrestricted,time);
-unrestrictedProgress.Observe(true,true,unrestricted.KeepIds,time);
-Check(unrestrictedProgress.SoldCount==5 && unrestrictedProgress.Error=="","opt-out passes send validation and receipt verification");
-foreach(var keep in new[]{false,true})foreach(var sell in new[]{false,true})
+var unrestrictedOptions=new FishingRetentionOptions{KeepLegendary=false,KeepLocked=false};
+var unrestricted=FishingSalePlan.Build(bag,unrestrictedOptions);
+Check(unrestricted.Items.Select(f=>f.InvenIndex).SequenceEqual(new long[]{1,2,3,4,5}),"opt-out includes unlock candidates but retains unknown grades and missing data");
+Check(unrestricted.RequiresUnlock.SequenceEqual(new long[]{5}),"locked candidate requires native unlock first");
+bool lockedRejected=false;try{new FishingSaleProgress().Begin(unrestricted,time);}catch(InvalidOperationException){lockedRejected=true;}
+Check(lockedRejected,"sale rejects locked candidate before verified unlock");
+foreach(var legend in new[]{false,true})foreach(var keep in new[]{false,true})foreach(var sell in new[]{false,true})
 {
  using(var link=new FishingControlLink(data))
  {
-  link.Configure(new(){AutoSell=sell,KeepLegendaryAndLocked=keep});link.Start(123);
+  link.Configure(new(){AutoSell=sell,Retention=new FishingRetentionOptions{KeepLegendary=legend,KeepLocked=keep}});link.Start(123);
   var stored=FishingJson.Read<FishingSettings>(Path.Combine(data,"settings.json"))!;
   using var stream=File.OpenRead(Path.Combine(data,"control.json"));
   var command=(FishingControl)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(FishingControl)).ReadObject(stream)!;
-  Check(stored.AutoSell==sell && stored.KeepLegendaryAndLocked==keep && command.AutoSell==sell && command.KeepLegendaryAndLocked==keep,"independent options survive settings and runtime serialization");
+  Check(stored.AutoSell==sell && stored.Retention.KeepLegendary==legend && stored.Retention.KeepLocked==keep && command.AutoSell==sell && command.Retention.KeepLegendary==legend && command.Retention.KeepLocked==keep,"independent options survive settings and runtime serialization");
  }
 }
-Check(System.Text.Json.JsonSerializer.Deserialize<FishingSettings>("{\"AutoSell\":false}")!.KeepLegendaryAndLocked,"old settings retain fish by default");
+Check(System.Text.Json.JsonSerializer.Deserialize<FishingSettings>("{\"AutoSell\":false}")!.Retention.KeepLegendary!=false,"old settings retain fish by default");
 using(var stream=new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"AutoSell\":true}")))
 {
  var command=(FishingControl)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(FishingControl)).ReadObject(stream)!;
- Check(command.KeepLegendaryAndLocked!=false,"old runtime commands retain fish by default");
+ Check(command.Retention==null || command.Retention.KeepLegendary!=false,"old runtime commands retain fish by default");
 }
-var legendaryBag=Enumerable.Range(1,230).Select(i=>Fish(i,4,i%2==0)).ToArray();
-var legendaryPlan=FishingSalePlan.Build(legendaryBag,false);
+var legendaryBag=Enumerable.Range(1,230).Select(i=>Fish(i,4)).ToArray();
+var legendaryPlan=FishingSalePlan.Build(legendaryBag,unrestrictedOptions);
 Check(legendaryPlan.Items.Length==100 && legendaryPlan.Sellable==230 && legendaryPlan.KeepIds.Length==130,"legendary-only opt-out remains bounded");
 var legendaryPolicy=new FishingPolicy();var legendarySnapshot=S();legendarySnapshot.BagFull=true;legendarySnapshot.SaleReady=true;legendarySnapshot.SellableCount=legendaryPlan.Sellable;
-var legendaryControl=C();legendaryControl.AutoSell=true;legendaryControl.KeepLegendaryAndLocked=false;
+var legendaryControl=C();legendaryControl.AutoSell=true;legendaryControl.Retention=unrestrictedOptions;
 Check(legendaryPolicy.Next(legendarySnapshot,legendaryControl,time)==FishingAction.SellFish,"legendary-only full bag can sell after opt-out");
 var legendaryProgress=new FishingSaleProgress();legendaryProgress.Begin(legendaryPlan,time);legendaryProgress.Observe(true,true,legendaryPlan.KeepIds,time);
 legendarySnapshot.BagFull=false;legendarySnapshot.SalePending=legendaryProgress.Pending;
@@ -243,4 +244,6 @@ Check(p.Next(ms,MapControl(),mapTime)==FishingAction.ClosePopup,"due map closes 
 mapTime+=TimeSpan.FromMilliseconds(100).Ticks;ms.State="None";ms.ResultPopup=false;
 Check(p.Next(ms,MapControl(),mapTime)==FishingAction.TravelLobby,"travel precedes new cast and consumables");
 Check(p.Next(ms,new FishingControl(),mapTime)==FishingAction.None,"stop revokes pending map travel");
+assertions+=RetentionTests.Run();
+assertions+=UnlockTests.Run();
 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{status="pass",assertions,gameRequests=0,injection=false}));

@@ -21,6 +21,7 @@ public static class HookCompiler
         if(resolved.Report.Status!="compatible")throw new CompatibilityException(resolved.Report);
         ValidateEnums(resolved);
         ValidateDataProperties(resolved);
+        ValidateUnlockApi(resolved);
         var assembly=typeof(HookCompiler).Assembly;
         var sources=assembly.GetManifestResourceNames().Where(n=>n.StartsWith("Hook.",StringComparison.Ordinal)).OrderBy(n=>n,StringComparer.Ordinal).Select(n=>CSharpSyntaxTree.ParseText(Encoding.UTF8.GetString(Resource(n)),path:n)).ToList();
         sources.Add(CSharpSyntaxTree.ParseText(GenerateSource(resolved),path:"FishingClient.g.cs"));
@@ -46,11 +47,11 @@ public static class HookCompiler
     }
     private static void ValidateDataProperties(ResolvedBindings r)
     {
-        foreach(var check in new[]{("Tables.Default","RoomDuration"),("Tables.Bait","Id,BuffId"),("Tables.Buff","Id"),("Tables.Fish","Id,Grade"),("Tables.Shop","ShopItemId"),("Tables.ShopEntries","GroupId,ItemType,ItemId,PriceCount"),("Player.Data","FishingFishInvenSlot")})
+        foreach(var check in new[]{("Tables.Default","RoomDuration"),("Tables.Bait","Id,BuffId"),("Tables.Buff","Id"),("Tables.Fish","Id,Grade,NameTextId"),("Tables.Shop","ShopItemId"),("Tables.ShopEntries","GroupId,ItemType,ItemId,PriceCount"),("Inventory.FishList","InvenIndex,Id,Size,IsLock"),("Player.Data","FishingFishInvenSlot")})
         {
             var member=BindingResolver.Api(r,r.Contract.Apis.Single(a=>a.Role==check.Item1));
             TypeReference result=member switch {MethodDefinition m=>m.ReturnType,PropertyDefinition p=>p.PropertyType,FieldDefinition f=>f.FieldType,_=>throw new InvalidOperationException("Unsupported data API")};
-            if(check.Item1=="Tables.ShopEntries")result=((GenericInstanceType)result).GenericArguments.Single();
+            if(check.Item1=="Tables.ShopEntries" || check.Item1=="Inventory.FishList")result=((GenericInstanceType)result).GenericArguments.Single();
             var type=result.Resolve();
             foreach(var name in check.Item2.Split(','))if(!type.Properties.Any(p=>p.Name==name && p.GetMethod!=null) && !type.Fields.Any(f=>f.Name==name))
                 throw new InvalidOperationException(check.Item1+" 缺少数据属性 "+name+"，尚未注入。");
@@ -65,6 +66,16 @@ public static class HookCompiler
             string response="Proto.Net.Fishing"+kind+"Response";
             int count=methods.Count(m=>m.Body.Instructions.Any(i=>i.Operand is MethodReference call && call.DeclaringType.FullName==response && call.Name=="get_Parser"));
             if(count!=1)throw new InvalidOperationException(response+" 原生回执入口不唯一，尚未注入："+count);
+        }
+    }
+    private static void ValidateUnlockApi(ResolvedBindings r)
+    {
+        foreach(var item in new[]{("Inventory.Unlock","System.Void",new[]{"System.Int64","System.Boolean","System.Action"}),
+            ("Inventory.UnlockReply","System.Boolean",new[]{"Proto.Net.FishingFishLockRequest","System.Byte[]","System.Int32","System.Int32","System.Action"})})
+        {
+            var method=(MethodDefinition)BindingResolver.Api(r,r.Contract.Apis.Single(a=>a.Role==item.Item1));
+            if(!method.IsStatic || method.ReturnType.FullName!=item.Item2 || !method.Parameters.Select(p=>p.ParameterType.FullName).SequenceEqual(item.Item3))
+                throw new InvalidOperationException("解锁接口签名发生变化，尚未注入："+item.Item1);
         }
     }
     public static string GenerateSource(ResolvedBindings r)

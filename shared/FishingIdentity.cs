@@ -25,8 +25,7 @@ namespace BD2Fishing
         public double CastGauge {get;set;} = 0.9;
         public bool PreferWeak {get;set;} = true;
         public bool AutoSell {get;set;}
-        // DataContractJsonSerializer skips initializers: missing/null means retain.
-        public bool? KeepLegendaryAndLocked {get;set;} = true;
+        public FishingRetentionOptions Retention {get;set;} = new FishingRetentionOptions();
         public bool AutoBait {get;set;}
         public bool AutoMapRenewal {get;set;}
         public bool Valid(long now, int pid) => Enabled && !string.IsNullOrEmpty(OwnerId) && ProcessId == pid && UntilUtcTicks > now && UntilUtcTicks <= now + TimeSpan.FromSeconds(15).Ticks && ValidSettings(NextCastMilliseconds, CastGauge);
@@ -53,6 +52,11 @@ namespace BD2Fishing
         public string SaleStatus {get;set;} = "尚未自动出售";
         public long SaleReplySerial {get;set;}
         public bool SaleReplyAccepted {get;set;}
+        public long UnlockReplySerial {get;set;}
+        public long UnlockReplyIndex {get;set;}
+        public bool UnlockReplyAccepted {get;set;}
+        public int UnlockedCount {get;set;}
+        public FishingSpeciesSummary[] FishSpecies {get;set;} = new FishingSpeciesSummary[0];
         public bool BaitReady {get;set;}
         public bool BaitCanUse {get;set;}
         public int BaitCount {get;set;}

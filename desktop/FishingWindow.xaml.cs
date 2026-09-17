@@ -15,13 +15,13 @@ public partial class FishingWindow:Window
   root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
   var s=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))??new();
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))s=new();
-  IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;KeepFishBox.IsChecked=s.KeepLegendaryAndLocked;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
+  IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;LoadRetention(s.Retention);AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
   initialized=true;timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};timer.Tick+=(_,_)=>Refresh();timer.Start();
  }
  private FishingSettings Settings()
  {
   if(!int.TryParse(IntervalBox.Text,out var delay)||!double.TryParse(CastBox.Text,NumberStyles.Number,CultureInfo.InvariantCulture,out var gauge)||!FishingControl.ValidSettings(delay,gauge/100))throw new InvalidOperationException("请输入 0–60000 毫秒的间隔，以及 5–95% 的蓄力。");
-  return new(){NextCastMilliseconds=delay,CastGauge=gauge/100,PreferWeak=WeakBox.IsChecked==true,AutoSell=AutoSellBox.IsChecked==true,KeepLegendaryAndLocked=KeepFishBox.IsChecked==true,AutoBait=AutoBaitBox.IsChecked==true,AutoMapRenewal=AutoMapBox.IsChecked==true};
+  return new(){NextCastMilliseconds=delay,CastGauge=gauge/100,PreferWeak=WeakBox.IsChecked==true,AutoSell=AutoSellBox.IsChecked==true,Retention=RetentionSettings(),AutoBait=AutoBaitBox.IsChecked==true,AutoMapRenewal=AutoMapBox.IsChecked==true};
  }
  private void SettingsChanged(object sender,RoutedEventArgs e)
  {
@@ -63,7 +63,7 @@ public partial class FishingWindow:Window
   ReasonText.Text=s.Error.Length>0?s.Error:link.Error.Length>0?link.Error:link.Enabled?s.Reason:s.Ready?"准备好后点击「开始钓鱼」。":"请进入钓鱼地点并面向水面。";
   StatsText.Text=$"鱼：{(s.FishId>0?s.FishId.ToString():"未上钩")}　血量：{s.FishHp:0}　剩余：{s.TimeRemaining:0} 秒　确认收获：{s.Catches}";
   InventoryText.Text=$"鱼背包：{s.BagCount}/{s.BagCapacity}　可售：{s.SellableCount}　保留：{s.ProtectedFishCount}　已确认出售：{s.SoldCount}";
-  SaleText.Text=s.SaleStatus;
+  SaleText.Text=s.SaleStatus+(s.UnlockedCount>0?$" · 已确认解锁 {s.UnlockedCount} 条":"");UpdateSpecies(s.FishSpecies);
   BaitText.Text=s.BaitReady?$"鱼饵：{s.BaitCount} 份　{(s.BaitActive?(s.BaitRemainingSeconds>0?$"增益剩余 {s.BaitRemainingSeconds:0} 秒":"增益生效中"):"增益未生效")}　已确认使用：{s.BaitUsedCount}":"鱼饵：尚未就绪";
   BaitStatusText.Text=s.BaitStatus;
   MapText.Text=s.MapRenewalStatus+(s.MapRenewals>0?$" · 已完成 {s.MapRenewals} 次往返":"");

@@ -12,8 +12,8 @@ public partial class FishingWindow
   Show();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
   Check(!StartButton.IsEnabled,"start disabled before snapshot");Check(IntervalBox.Text=="1000"&&CastBox.Text=="90","defaults");Check(AutoSellBox.IsChecked==true,"automatic sale default visible");Check(AutoBaitBox.IsChecked==true,"automatic bait default visible");
   Check(AutoMapBox.IsChecked==true,"map renewal default visible");
-  Check(KeepFishBox.IsChecked==true,"legendary and locked fish retained by default");
-  Check((string)AutoSellBox.Content=="背包满自动出售" && (string)KeepFishBox.Content=="保留全部传说鱼和锁定鱼","sale and retention have separate labels");
+  Check(KeepLegendaryBox.IsChecked==true && KeepLockedBox.IsChecked==true && KeepUnknownBox.IsChecked==true,"three independent protections enabled by default");
+  Check((string)AutoSellBox.Content=="背包满自动出售" && (string)KeepLegendaryBox.Content=="保留全部传说鱼" && (string)KeepLockedBox.Content=="保留全部锁定鱼" && (string)KeepUnknownBox.Content=="保留资料不明的鱼","four independent labels");
   var s=new FishingSnapshot{Ready=true,CanCast=true,ProcessId=1234,CapturedUtcTicks=DateTime.UtcNow.Ticks,State="Fighting",FishId=101,FishHp=150,TimeRemaining=32,Reason="等待弱点进入判定区",Network="FishingBiteStart 响应成功"};
   FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(StartButton.IsEnabled,"ready enables start");
   StartClick(this,new RoutedEventArgs());Check(link.Enabled,"start writes lease");
@@ -23,17 +23,35 @@ public partial class FishingWindow
   Check(c.AutoSell,"enabled sale included in lease");
   AutoSellBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoSell,"sale can be disabled live");
   AutoSellBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoSell,"sale preference persisted");
-  foreach(var sell in new[]{false,true})foreach(var keep in new[]{true,false})
+  foreach(var sell in new[]{false,true})foreach(var legendary in new[]{true,false})foreach(var locked in new[]{true,false})foreach(var unknown in new[]{true,false})
   {
-   AutoSellBox.IsChecked=sell;KeepFishBox.IsChecked=keep;
+   AutoSellBox.IsChecked=sell;KeepLegendaryBox.IsChecked=legendary;KeepLockedBox.IsChecked=locked;KeepUnknownBox.IsChecked=unknown;
    var saved=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!;
    var live=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;
-   Check(saved.AutoSell==sell && saved.KeepLegendaryAndLocked==keep,"independent sale and retention preferences saved");
-   Check(live.AutoSell==sell && live.KeepLegendaryAndLocked==keep,"independent sale and retention preferences applied live");
+   Check(saved.AutoSell==sell && saved.Retention.KeepLegendary==legendary && saved.Retention.KeepLocked==locked && saved.Retention.KeepUnknown==unknown,"independent retention settings persisted");
+   Check(live.AutoSell==sell && live.Retention.KeepLegendary==legendary && live.Retention.KeepLocked==locked && live.Retention.KeepUnknown==unknown,"independent retention settings sent live");
   }
+  var beforeInvalid=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;
+  var invalidSettings=Settings();invalidSettings.AutoSell=!beforeInvalid.AutoSell;
+  invalidSettings.Retention.SizeRules=new[]{new FishingSizeRule{FishId=0,Mode=FishingSizeMode.Maximum}};
+  bool invalidRejected=false;try{link.Configure(invalidSettings);}catch(ArgumentException){invalidRejected=true;}
+  Check(invalidRejected,"invalid species rule is rejected before configuring live lease");
+  typeof(FishingControlLink).GetMethod("Pulse",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(link,null);
+  var afterInvalid=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;
+  Check(afterInvalid.AutoSell==beforeInvalid.AutoSell && afterInvalid.Retention.Fingerprint()==beforeInvalid.Retention.Fingerprint(),"heartbeat cannot publish partially applied invalid retention settings");
+  UpdateSpecies(new[]{new FishingSpeciesSummary{FishId=101,Name="示例鱼甲",Count=3,MinSize=100,MaxSize=200},new FishingSpeciesSummary{FishId=202,Name="示例鱼乙",Count=2,MinSize=90,MaxSize=180}});
+  SpeciesBox.SelectedIndex=0;SizeModeBox.SelectedIndex=(int)FishingSizeMode.Both;
+  SpeciesBox.SelectedIndex=1;SizeModeBox.SelectedIndex=(int)FishingSizeMode.Maximum;
+  var rules=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.Retention.SizeRules;
+  Check(rules.Single(r=>r.FishId==101).Mode==FishingSizeMode.Both && rules.Single(r=>r.FishId==202).Mode==FishingSizeMode.Maximum,"species have independent size choices");
+  UpdateSpecies(Array.Empty<FishingSpeciesSummary>());
+  Check(Settings().Retention.SizeRules.Length==2,"absent species retain saved rules");
   var reopenRoot=Path.Combine(root,"reopen");FishingJson.Write(Path.Combine(reopenRoot,"settings.json"),FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!);
   var reopened=new FishingWindow(reopenRoot);
-  Check(reopened.AutoSellBox.IsChecked==true && reopened.KeepFishBox.IsChecked==false,"reopened window restores independent options");reopened.Close();
+  Check(reopened.AutoSellBox.IsChecked==true && reopened.KeepLegendaryBox.IsChecked==false && reopened.KeepLockedBox.IsChecked==false && reopened.KeepUnknownBox.IsChecked==false,"reopened window restores independent options");
+  Check(reopened.Settings().Retention.SizeRules.Length==2,"reopened window restores species rules");reopened.Close();
+  var legacyRoot=Path.Combine(root,"legacy");Directory.CreateDirectory(legacyRoot);File.WriteAllText(Path.Combine(legacyRoot,"settings.json"),"{\"KeepLegendaryAndLocked\":false}");
+  var legacy=new FishingWindow(legacyRoot);Check(legacy.AutoSellBox.IsChecked==true && legacy.KeepLegendaryBox.IsChecked==true && legacy.KeepLockedBox.IsChecked==true && legacy.KeepUnknownBox.IsChecked==true,"old combined opt-out does not disable new protections");legacy.Close();
   Check(c.AutoMapRenewal,"map renewal included in lease");
   AutoMapBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoMapRenewal,"map renewal can be disabled live");
   AutoMapBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoMapRenewal,"map renewal preference persisted");
