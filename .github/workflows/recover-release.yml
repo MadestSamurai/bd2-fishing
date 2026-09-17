@@ -1,0 +1,77 @@
+name: Resume verified release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag
+        required: true
+      run_id:
+        description: Successful build artifact run for that exact tag commit
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Resume uploads and verify all release digests
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          BUILD_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag=$env:RELEASE_TAG
+          $runId=$env:BUILD_RUN_ID
+          if($tag -notmatch '^v\d+\.\d+\.\d+$' -or $runId -notmatch '^\d+$'){throw 'Invalid release input'}
+          $run=gh run view $runId --json headSha,jobs | ConvertFrom-Json
+          $tagCommit=git rev-parse "$tag^{commit}"
+          if($LASTEXITCODE -ne 0 -or $tagCommit -ne $run.headSha){throw 'Build/tag commit mismatch'}
+          if(!($run.jobs | Where-Object { $_.name -eq 'build' -and $_.conclusion -eq 'success' })){throw 'No successful build job'}
+          gh run download $runId --name BD2Fishing-win-x64 --dir dist
+          if($LASTEXITCODE -ne 0){throw 'Artifact download failed'}
+          $manifestFiles=@(Get-ChildItem dist -Recurse -Filter release.json)
+          if($manifestFiles.Count -ne 1){throw 'Release manifest not unique'}
+          $root=$manifestFiles[0].Directory.FullName
+          $manifest=Get-Content $manifestFiles[0].FullName -Raw | ConvertFrom-Json
+          if('v'+$manifest.version -ne $tag){throw 'Manifest/tag mismatch'}
+          $sums=Get-Content (Join-Path $root 'SHA256SUMS.txt')
+          if($sums.Count -ne 4){throw 'Expected four binary/archive checksums'}
+          foreach($line in $sums){
+            if($line -notmatch '^([a-f0-9]{64})  ([A-Za-z0-9._-]+)$'){throw 'Invalid checksum row'}
+            if((Get-FileHash (Join-Path $root $Matches[2])).Hash.ToLowerInvariant() -ne $Matches[1]){throw 'Artifact checksum mismatch'}
+          }
+          $assets=@(Get-ChildItem $root -File)
+          if($assets.Count -ne 6){throw 'Expected exactly six release assets'}
+          $expected=@{}
+          foreach($asset in $assets){$expected[$asset.Name]='sha256:'+(Get-FileHash $asset.FullName).Hash.ToLowerInvariant()}
+          $releaseText=gh release view $tag --json isDraft,assets 2>$null
+          if($LASTEXITCODE -ne 0){
+            git show "${tag}:docs/RELEASE_NOTES.md" | Set-Content notes.md -Encoding utf8
+            if($LASTEXITCODE -ne 0){throw 'Release notes unavailable'}
+            gh release create $tag --draft --verify-tag --title "BD2 Fishing $tag" --notes-file notes.md
+            if($LASTEXITCODE -ne 0){throw 'Draft creation failed'}
+          }
+          for($attempt=1;$attempt -le 4;$attempt++){
+            $release=gh release view $tag --json isDraft,assets | ConvertFrom-Json
+            if($LASTEXITCODE -ne 0){throw 'Cannot inspect release'}
+            if(@($release.assets | Where-Object { !$expected.ContainsKey($_.name) }).Count){throw 'Unexpected release asset'}
+            $missing=@($assets | Where-Object { $file=$_; !($release.assets | Where-Object { $_.name -eq $file.Name -and $_.state -eq 'uploaded' -and $_.digest -eq $expected[$file.Name] }) })
+            if(!$missing.Count){
+              if($release.isDraft){gh release edit $tag --draft=false --latest; if($LASTEXITCODE -ne 0){throw 'Publication failed'}}
+              Write-Host 'All six published asset digests match the verified build.'
+              exit 0
+            }
+            if(!$release.isDraft){throw 'Published release differs; refusing to overwrite'}
+            if($attempt -eq 4){throw 'Uploads incomplete; verified files remain in the draft for a later retry'}
+            Write-Host "Upload attempt $attempt; missing: $($missing.Name -join ', ')"
+            gh release upload $tag @($missing.FullName) --clobber
+            if($LASTEXITCODE -ne 0){Write-Warning 'Upload interrupted; retaining completed assets and checking digests again'}
+            Start-Sleep -Seconds 3
+          }
