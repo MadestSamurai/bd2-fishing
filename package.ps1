@@ -46,6 +46,7 @@ foreach($flavor in @('Portable','Lite')){
     Copy-Item -LiteralPath $exe -Destination (Join-Path $bundle "$name.exe")
     foreach($file in @('README.md','README.en.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses') -Destination $bundle -Recurse
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs') -Destination $bundle -Recurse
     Compress-Archive -LiteralPath $bundle -DestinationPath $zipPath -CompressionLevel Optimal
     $assets+=@($exePath,$zipPath)
     $flavors += [ordered]@{name=$flavor;selfContained=($selfContained -eq 'true');runtimeRequirement=$(if($flavor -eq 'Lite'){'.NET Desktop Runtime 8 x64'}else{'none'});exeBytes=(Get-Item $exePath).Length;uiAssertions=$ui.assertions.Count;toolFingerprint=$identity.toolFingerprint}
