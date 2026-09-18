@@ -1,5 +1,7 @@
 # BD2 Fishing
 
+> **Disclaimer:** Using this assistant carries risks, including account penalties or bans, game errors, and data loss. This project is not affiliated with the game publisher and does not guarantee safe use. Assess the risks and follow the game?s rules; you assume responsibility for all risks and consequences of using the tool.
+
 English · [简体中文](README.md)
 
 A standalone Windows tool for continuous fishing in **BrownDust II**. It shows live state, reels using the game's normal input flow, manages bait and the fish bag, and can return to the same fishing map before its time limit.
