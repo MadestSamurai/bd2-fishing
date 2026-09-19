@@ -1,31 +1,32 @@
-# BD2 Fishing · 独立自动钓鱼
+# BD2 Fishing · 钓鱼助手
 
 > **免责声明：** 使用本辅助工具存在风险，可能导致账号处罚、封禁、游戏异常或数据损失。本项目不隶属于游戏官方，也不保证使用安全；请自行评估并遵守游戏相关规则，使用产生的风险及后果由用户自行承担。
 
 [English](README.en.md) · 简体中文
 
-[下载 Windows EXE](https://github.com/MadestSamurai/bd2-fishing/releases/latest) · [使用与兼容说明](docs/COMPATIBILITY.md) · [问题反馈](https://github.com/MadestSamurai/bd2-fishing/issues)
+[下载最新版本](https://github.com/MadestSamurai/bd2-fishing/releases/latest) · [问题反馈](https://github.com/MadestSamurai/bd2-fishing/issues)
 
-BrownDust II Windows 客户端的独立钓鱼辅助工具。通过游戏正常手动钓鱼入口完成当前钓点的连续钓鱼，包含蓄力、提竿、收线、长按、结算、自动用饵和满背包出售。不会调用游戏内自动钓鱼。
+适用于 BrownDust II Windows 客户端的独立钓鱼助手。通过游戏正常手动钓鱼入口完成连续钓鱼，自动处理鱼饵、鱼背包与到期换图。
 
-## 使用
+## 下载
 
-1. 从 Releases 下载 `BD2Fishing-0.4.0-Portable-win-x64.exe`，或者下载包含使用说明和许可证的 ZIP。Portable 无需安装 .NET；Lite 需要 .NET Desktop Runtime 8 x64。两版都无需 Python、Visual Studio 或游戏开发 SDK。
-2. 启动游戏，进入钓鱼地图，关闭游戏内自动钓鱼；落点离水较远时，工具会自动走到可钓区域。升级工具前需正常重启游戏，让旧的已注入组件退出。
-3. 打开工具，点击 **连接游戏**。首次连接会读取本机客户端接口并自动生成适配组件，通常需要数秒。
-4. 显示“钓点已识别”后点击 **开始钓鱼**。工具不会自行连接或开启自动化。
-5. 点击 **停止钓鱼**或关闭窗口可停止。异常退出后控制租约最多 10 秒过期，输入会在游戏恢复帧时释放。
+当前版本 **0.4.0**。两版功能相同，均内置简体中文／English。
 
-需要与游戏相同的权限。当前支持官方 Windows x64 Mono 客户端；不支持手机、模拟器内的 Android 客户端或 IL2CPP 客户端。
+| 版本 | 运行环境 | 建议 |
+| --- | --- | --- |
+| **Portable** | 内置 .NET 运行时 | 首次使用推荐，下载即用 |
+| **Lite** | 需安装 [.NET Desktop Runtime 8 x64](https://dotnet.microsoft.com/download/dotnet/8.0) | 已安装运行时，下载更小 |
 
-## 选择下载版本
+只需下载一种版本：EXE 可独立运行，ZIP 附中英文说明和许可证。无需 Python、开发 SDK 或其他 BD2 工具。Lite 需要 **Desktop Runtime**，基础 .NET Runtime 或 ASP.NET Runtime 不够。使用 `SHA256SUMS.txt` 校验下载。
 
-| 版本 | 自带 .NET 运行库 | 运行要求 | 适用情况 |
-| --- | --- | --- | --- |
-| **Portable** | 是 | Windows x64，直接运行 EXE | 不确定电脑是否已安装运行库，建议选此版 |
-| **Lite 精简版** | 否 | Windows x64，预先安装 **.NET Desktop Runtime 8 x64** | 已有运行库，下载体积更小 |
+## 快速开始
 
-两版功能、跨版本 Hook 适配和设置完全一致，都提供 EXE 与含说明／许可证的 ZIP。Lite 需要的是 **Desktop Runtime**，只有 .NET Runtime 或 ASP.NET Runtime 不够；[微软 .NET 8 下载页](https://dotnet.microsoft.com/download/dotnet/8.0)选择 Windows x64 的 Desktop Runtime，建议安装最新 8.0 补丁。[微软单文件部署说明](https://learn.microsoft.com/dotnet/core/deploying/single-file/overview)。
+**升级前**：暂停并关闭旧工具，正常重启游戏，再打开新版连接。
+
+1. 进入已解锁的钓鱼地图，关闭游戏内自动钓鱼。
+2. 打开助手，点击「连接游戏」，等待钓点识别。
+3. 检查鱼饵与保留规则，点击「开始钓鱼」。落点离水较远时，默认自动走到可钓区域。
+4. 点击「停止钓鱼」或关闭窗口可停止；已开始的这一竿可能通过正常松开回调完成。
 
 ## 功能与设置
 
@@ -53,13 +54,19 @@ BrownDust II Windows 客户端的独立钓鱼辅助工具。通过游戏正常�
 
 不自动购买补给或解锁钓场。往返仅回到原钓场，返回位置由游戏正常入场逻辑安排。关闭往返开关或停止工具会取消尚未发出的返程。停止蓄力会走正常松开回调，可能完成已经开始的这一竿。
 
-## 跨版本适配
+## 界面语言
 
-发行包不包含游戏 DLL，也不锁定某个客户端 SHA 或 MVID。连接时使用内置接口指纹识别类型和成员；支持混淆名称变化、元数据重排和不影响目标接口的更新。随后用内置 Roslyn 编译器针对本机接口编译 Hook，用户无需重新打包。
+在顶部 **语言 / Language** 中选择简体中文或 English。首次启动跟随系统：中文系统使用简体中文，其他系统使用英语；之后记住手动选择。切换语言不会重启任务或改变设置。游戏提供的名称和图片保持游戏语言，原始诊断保留原文。
 
-如果钓鱼接口、数据结构或协议发生不兼容变化，工具会明确报出检查失败，停止继续连接或操作；不会通过猜测接口强行运行。**跨版本适配不等于保证兼容所有未来更新。** [兼容范围、验证证据与维护方法](docs/COMPATIBILITY.md)。
+维护翻译见 [翻译说明](docs/LOCALIZATION.md)。
 
-## 诊断
+## 兼容与限制
+
+支持官方 Windows x64 PC 客户端，一次连接一个游戏进程；工具与游戏需使用相同权限。不支持手机或 Android 模拟器客户端。首次连接会解析本机接口并生成组件，可能需要数秒。无法可靠匹配接口时停止连接并显示原因；跨版本适配不保证所有未来更新都无需维护。
+
+发行包不包含游戏 DLL、资源、账号库或私有采集文件。不调用游戏内自动钓鱼，不购买补给或解锁钓场。
+
+## 诊断与反馈
 
 点击“打开诊断目录”查看 `%LOCALAPPDATA%\BD2Fishing`：
 
@@ -69,27 +76,21 @@ BrownDust II Windows 客户端的独立钓鱼辅助工具。通过游戏正常�
 
 这些文件只保存在本机，不会自动上传。报告问题时请先检查文件中的个人信息。其他已注入的 BD2 工具无法随窗口关闭自动卸载；如提示模块冲突，关闭相关工具并正常重启游戏。
 
-## 从源码构建
+反馈时请提供版本、提示文字和相关日志片段，先去除账号、个人路径等信息。不要上传游戏 DLL、完整库存或连接凭据。
 
-构建机要求 Windows x64、.NET 8 SDK（或兼容的更新 SDK）、可访问 NuGet。**不需要安装游戏**。
+## 开发与贡献
+
+需要 Windows x64、PowerShell 和 .NET 8 SDK。普通构建与回归不需要安装游戏，也不会连接游戏。
 
 ```powershell
-git clone https://github.com/MadestSamurai/bd2-fishing.git
-cd bd2-fishing
 .\build.ps1 -Locked
 .\package.ps1 -Locked
 ```
 
-`build.ps1` 编译桌面程序并执行钓鱼状态机、出售／用饵保护、跨版本解析回归。`package.ps1` 再执行单 EXE 身份与 WPF 界面检查，输出 `dist/v版本号/` 中的 Portable／Lite EXE、ZIP、SHA256 校验文件和发行信息；不会连接游戏。
+产物位于 `dist/v版本号/`。打包会核对 Portable／Lite 运行环境并执行界面检查。
 
-详见[维护与发布流程](docs/RELEASING.md)。提交到 main 自动检查；推送 `vX.Y.Z` 标签自动构建 GitHub Release。
+[开发与发布流程](docs/RELEASING.md) · [文档与发布格式](docs/PUBLICATION_STYLE.md) · [当前版本说明](docs/RELEASE_NOTES.md)
 
 ## 许可
 
-项目代码采用 [MIT](LICENSE)。SharpMonoInjector、Harmony、Mono.Cecil、Roslyn 和 .NET 的许可保留于 [第三方说明](THIRD_PARTY_NOTICES.md) 和 `licenses/`。项目与游戏官方无关联；仓库及发行包不提供游戏程序集、资源、账号信息或游戏通信凭据。
-
-## 界面语言
-
-在顶部 **语言 / Language** 中选择简体中文或 English。首次启动跟随系统：中文系统使用简体中文，其他系统使用英语；此后记住手动选择。运行中切换不会重启自动操作。Portable 和 Lite 都内置两种语言，无需另下语言包。游戏提供的鱼名／图片跟随游戏语言；原始诊断保持原文。
-
-维护翻译参阅 [Localization](docs/LOCALIZATION.md)。
+项目代码采用 [MIT](LICENSE)。依赖保留各自许可，详见 [第三方许可说明](THIRD_PARTY_NOTICES.md)。本项目与游戏开发商或发行商无隶属关系。

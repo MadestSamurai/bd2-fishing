@@ -55,3 +55,9 @@ Every Portable/Lite EXE includes Chinese and English. ZIPs include both README f
 If the build succeeded but release uploads failed, run **Resume verified release** in GitHub Actions. Supply the existing tag and its build run ID. The workflow requires the build commit to match the tag, checks all artifact SHA256 values, retains matching uploaded assets, retries only missing or incomplete files, and publishes only when all six remote digests match. It refuses to replace differing assets in an already published release.
 
 This operation reuses the original build; do not move a published tag or rebuild binaries merely to recover a network interruption. If a retry still fails, the draft retains completed uploads for the next attempt.
+
+## 文档格式 / Documentation format
+
+README、仓库简介和 Release 统一遵循 [Publication style](PUBLICATION_STYLE.md)。新版本从 [Release template](RELEASE_TEMPLATE.md) 开始，更新 [当前版本说明](RELEASE_NOTES.md) 后再打包。
+
+Use the shared format for READMEs, repository descriptions and releases. Update both languages and release notes before packaging.
