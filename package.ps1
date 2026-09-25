@@ -1,4 +1,4 @@
-param([string]$Version='', [switch]$Locked)
+﻿param([string]$Version='', [switch]$Locked)
 $ErrorActionPreference='Stop'
 $declared=([xml](Get-Content (Join-Path $PSScriptRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if(!$Version){$Version=$declared}
@@ -44,7 +44,7 @@ foreach($flavor in @('Portable','Lite')){
     $bundle=Join-Path $work $name;New-Item -ItemType Directory -Path $bundle | Out-Null
     Copy-Item -LiteralPath $exe -Destination $exePath
     Copy-Item -LiteralPath $exe -Destination (Join-Path $bundle "$name.exe")
-    foreach($file in @('README.md','README.en.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
+    foreach($file in @('README.md','README.en.md','DISTRIBUTION.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses') -Destination $bundle -Recurse
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs') -Destination $bundle -Recurse
     Compress-Archive -LiteralPath $bundle -DestinationPath $zipPath -CompressionLevel Optimal

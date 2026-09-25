@@ -272,5 +272,15 @@
   "；昼夜切换排队，先完成本竿": "; day/night transition queued until this catch finishes",
   "；请重新开始钓鱼": "; restart fishing to continue",
   "语言 / Language": "语言 / Language",
-  "简体中文": "简体中文"
+  "简体中文": "简体中文",
+  "免费开源交流工具 · GitHub：MadestSamurai · B站：MadSamurai": "Free & open source · GitHub: MadestSamurai · Bilibili: MadSamurai",
+  "来源与说明": "About & source",
+  "作者发布版免费提供": "Free release from the author",
+  "B站": "Bilibili",
+  "本工具用于交流学习，与游戏开发商、发行商无关联，也未获其背书。使用辅助工具可能导致账号处罚、封禁、游戏异常或数据损失。请了解并遵守游戏规则，评估风险后自行决定使用并承担相关后果。": "This community project is not affiliated with or endorsed by the game developer or publisher. Helper tools may result in account penalties, bans, game errors or data loss. Follow the game rules, assess the risks and take responsibility for your use.",
+  "作者提供的官方下载免费。第三方收费不代表作者参与、背书或提供服务；第三方修改版可能与作者发布版不同。请通过下方仓库和发布页核对来源。": "Official downloads are free. Third-party fees do not imply the author's involvement, endorsement or support. Modified builds may differ from the author's release. Check the source at the repository below.",
+  "MIT 许可证保持不变。本说明不增加许可限制，也不承诺免责效果。": "The MIT License remains unchanged. This notice adds no license restrictions and does not promise immunity from liability.",
+  "源码与官方下载（可选择复制）": "Official source and downloads (select to copy)",
+  "关闭": "Close",
+  "BD2 钓鱼 · 0.4.1": "BD2 Fishing · 0.4.1"
 }

@@ -15,7 +15,7 @@ public partial class FishingWindow:Window
  private FishingSnapshot? snapshot;private bool initialized,connecting,closing,smoke;
  public FishingWindow(string? dataRoot=null)
  {
-  root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
+  root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageBox);Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
   var s=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))??new();
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))s=new();
   IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;LoadRetention(s.Retention);AutoApproachBox.IsChecked=s.AutoApproach;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;

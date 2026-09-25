@@ -1,6 +1,8 @@
 # BD2 Fishing
 
-> **Disclaimer:** Using this assistant carries risks, including account penalties or bans, game errors, and data loss. This project is not affiliated with the game publisher and does not guarantee safe use. Assess the risks and follow the game's rules; you assume responsibility for all risks and consequences of using the tool.
+> **Free & open source:** Official releases are provided free by GitHub **MadestSamurai** · Bilibili **MadSamurai**. [Official downloads](https://github.com/MadestSamurai/bd2-fishing/releases) · [Source and risk notice](DISTRIBUTION.md#english). Third-party fees do not imply the author’s involvement, endorsement or support.
+>
+> **Risk notice:** This is an unofficial community tool. Use may result in account penalties, bans, game errors or data loss. Follow the game rules and accept responsibility for the risks of use. The MIT license remains unchanged.
 
 English · [简体中文](README.md)
 
@@ -10,7 +12,7 @@ A standalone fishing assistant for the BrownDust II Windows client. Uses the gam
 
 ## Download
 
-Current version: **0.4.0**. Both editions have the same features and include Simplified Chinese / English.
+Current version: **0.4.1**. Both editions have the same features and include Simplified Chinese / English.
 
 | Edition | Runtime requirement | Recommended for |
 | --- | --- | --- |
