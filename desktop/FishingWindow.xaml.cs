@@ -12,7 +12,16 @@ public partial class FishingWindow:Window
 {
  private WindowLanguage? language;
  private readonly string root;private readonly FishingControlLink link;private readonly DispatcherTimer timer;
- private FishingSnapshot? snapshot;private bool initialized,connecting,closing,smoke;
+ private FishingSnapshot? snapshot;private bool initialized,connecting,closing,smoke,refreshing,starting;
+ private readonly CancellationTokenSource lifetime=new();
+ private Task controlQueue=Task.CompletedTask,shutdownTask=Task.CompletedTask;
+ private int connectionEpoch;
+ private Task QueueControl(Action action)
+ {
+  var previous=controlQueue;
+  return controlQueue=Task.Run(async()=>{try{await previous.ConfigureAwait(false);}catch{}action();});
+ }
+ private void ReportError(string stage,Exception ex){FishingDiagnostics.Write(root,stage,error:ex);if(!closing)ReasonText.Text=ex.GetBaseException().Message;}
  public FishingWindow(string? dataRoot=null)
  {
   root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageBox);Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
@@ -20,7 +29,7 @@ public partial class FishingWindow:Window
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))s=new();
   IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;LoadRetention(s.Retention);AutoApproachBox.IsChecked=s.AutoApproach;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
   language=new(this,LanguagePreference.Read(root));LanguageBox.SelectedIndex=language.Catalog.Language=="zh-CN"?0:1;
-  initialized=true;timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};timer.Tick+=(_,_)=>Refresh();timer.Start();
+  initialized=true;timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};timer.Tick+=async(_,_)=>await RefreshAsync();timer.Start();
  }
  private void LanguageChanged(object sender,SelectionChangedEventArgs e)
  {
@@ -34,33 +43,70 @@ public partial class FishingWindow:Window
   if(!int.TryParse(IntervalBox.Text,out var delay)||!double.TryParse(CastBox.Text,NumberStyles.Number,CultureInfo.InvariantCulture,out var gauge)||!FishingControl.ValidSettings(delay,gauge/100))throw new InvalidOperationException("请输入 0–60000 毫秒的间隔，以及 5–95% 的蓄力。");
   return new(){NextCastMilliseconds=delay,CastGauge=gauge/100,PreferWeak=WeakBox.IsChecked==true,AutoSell=AutoSellBox.IsChecked==true,Retention=RetentionSettings(),AutoApproach=AutoApproachBox.IsChecked==true,AutoBait=AutoBaitBox.IsChecked==true,AutoMapRenewal=AutoMapBox.IsChecked==true};
  }
- private void SettingsChanged(object sender,RoutedEventArgs e)
+ private async void SettingsChanged(object sender,RoutedEventArgs e)
  {
-  if(!initialized||closing)return;try{link.Configure(Settings());SettingsHint.Text="设置已保存；收线和长按仍按帧判断。";SettingsHint.Foreground=(Brush)FindResource("MutedBrush");}
-  catch(Exception ex){SettingsHint.Text=ex.Message;SettingsHint.Foreground=Brushes.Firebrick;}
+  if(!initialized||closing)return;
+  try{var settings=Settings();await QueueControl(()=>{if(!closing)link.Configure(settings);});if(!closing){SettingsHint.Text="设置已保存；收线和长按仍按帧判断。";SettingsHint.Foreground=(Brush)FindResource("MutedBrush");}}
+  catch(Exception ex){FishingDiagnostics.Write(root,"settings.failed",error:ex);if(!closing){SettingsHint.Text=ex.Message;SettingsHint.Foreground=Brushes.Firebrick;}}
  }
  private async void ConnectClick(object sender,RoutedEventArgs e)
  {
-  if(connecting)return;connecting=true;ConnectButton.IsEnabled=false;ReasonText.Text="正在连接钓鱼组件…";
-  try{var result=await Task.Run(()=>new FishingConnection(root).Connect(message=>Dispatcher.InvokeAsync(()=>{if(!closing)ReasonText.Text=message;})));if(!closing)ReasonText.Text=result;}
-  catch(Exception ex){if(!closing){StatusText.Text="连接未完成";ReasonText.Text=ex.GetBaseException().Message;}}
+  if(connecting||closing)return;connecting=true;connectionEpoch++;ConnectButton.IsEnabled=false;StartButton.IsEnabled=false;ReasonText.Text="正在连接钓鱼组件…";
+  FishingDiagnostics.Write(root,"ui.connect.clicked");
+  var wasEnabled=link.Enabled;link.RequestStop();
+  try
+  {
+   if(wasEnabled)await QueueControl(()=>link.Stop());
+   var result=await Task.Run(()=>new FishingConnection(root).Connect(message=>Dispatcher.InvokeAsync(()=>{if(!closing&&connecting)ReasonText.Text=message;}),cancellationToken:lifetime.Token));
+   if(!closing)ReasonText.Text=result;
+  }
+  catch(OperationCanceledException){FishingDiagnostics.Write(root,"connect.cancelled");}
+  catch(Exception ex){ReportError("ui.connect.failed",ex);if(!closing)StatusText.Text="连接未完成";}
   finally{connecting=false;if(!closing)ConnectButton.IsEnabled=true;}
  }
- private void StartClick(object sender,RoutedEventArgs e)
+ private async void StartClick(object sender,RoutedEventArgs e)=>await StartAsync();
+ private async Task StartAsync()
  {
+  if(starting||connecting||closing)return;starting=true;StartButton.IsEnabled=false;
+  var stopVersion=link.StopVersion;
   try
   {
    if(!FishingControlLink.Fresh(snapshot,DateTime.UtcNow)||!snapshot!.Ready)throw new InvalidOperationException("请先连接游戏并进入钓点，等待实时状态。");
-   if(!smoke){using var p=Process.GetProcessById(snapshot.ProcessId);if(!FishingIdentity.IsGameProcessName(p.ProcessName))throw new InvalidOperationException("游戏进程已变化，请重新连接。");}
-   link.Configure(Settings());link.Start(snapshot.ProcessId);StopButton.IsEnabled=true;StartButton.IsEnabled=false;StatusText.Text="自动钓鱼已开启";
+   int pid=snapshot.ProcessId;var settings=Settings();
+   await QueueControl(()=>
+   {
+    if(closing||link.StopVersion!=stopVersion)throw new OperationCanceledException();
+    if(!smoke){using var p=Process.GetProcessById(pid);if(!FishingIdentity.IsGameProcessName(p.ProcessName))throw new InvalidOperationException("游戏进程已变化，请重新连接。");}
+    link.Configure(settings);link.Start(pid,stopVersion);
+   });
+   if(!closing){StopButton.IsEnabled=link.Enabled;StatusText.Text=link.Enabled?"自动钓鱼已开启":"自动钓鱼已停止";}
   }
-  catch(Exception ex){ReasonText.Text=ex.Message;}
+  catch(OperationCanceledException){}
+  catch(Exception ex){ReportError("start.failed",ex);}
+  finally{starting=false;if(!closing)StartButton.IsEnabled=!link.Enabled&&!connecting&&FishingControlLink.Fresh(snapshot,DateTime.UtcNow)&&snapshot!.Ready;}
  }
- private void StopClick(object sender,RoutedEventArgs e){try{link.Stop();StatusText.Text="自动钓鱼已停止";StopButton.IsEnabled=false;}catch(Exception ex){ReasonText.Text=ex.Message;}}
- private void OpenFolderClick(object sender,RoutedEventArgs e){try{Directory.CreateDirectory(root);Process.Start(new ProcessStartInfo(root){UseShellExecute=true});}catch(Exception ex){ReasonText.Text=ex.Message;}}
- private void Refresh()
+ private async void StopClick(object sender,RoutedEventArgs e)=>await StopAsync();
+ private async Task StopAsync()
  {
-  snapshot=FishingJson.Read<FishingSnapshot>(Path.Combine(root,"latest.json"));
+  link.RequestStop();StopButton.IsEnabled=false;StatusText.Text="自动钓鱼已停止";
+  try{await QueueControl(()=>link.Stop());}catch(Exception ex){ReportError("stop.failed",ex);}
+ }
+ private void OpenFolderClick(object sender,RoutedEventArgs e){try{Directory.CreateDirectory(root);Process.Start(new ProcessStartInfo(root){UseShellExecute=true});}catch(Exception ex){ReasonText.Text=ex.Message;}}
+ private async Task RefreshAsync()
+ {
+  if(refreshing||connecting||closing)return;
+  refreshing=true;var epoch=connectionEpoch;
+  try
+  {
+   var value=await Task.Run(()=>FishingJson.Read<FishingSnapshot>(Path.Combine(root,"latest.json")));
+   if(closing||connecting||epoch!=connectionEpoch)return;
+   snapshot=value;RenderSnapshot();
+  }
+  catch(Exception ex){FishingDiagnostics.Throttled(root,"refresh.failed",ex);if(!closing)StartButton.IsEnabled=false;}
+  finally{refreshing=false;}
+ }
+ private void RenderSnapshot()
+ {
   bool fresh=FishingControlLink.Fresh(snapshot,DateTime.UtcNow);
   if(!fresh)
   {
@@ -69,7 +115,7 @@ public partial class FishingWindow:Window
    return;
   }
   var s=snapshot!;
-  if(link.Enabled && s.OwnerId==link.OwnerId && s.Error.Length>0){try{link.Stop();}catch{}StatusText.Text="自动钓鱼已暂停";}
+  if(link.Enabled && s.OwnerId==link.OwnerId && s.Error.Length>0){_ = StopAsync();StatusText.Text="自动钓鱼已暂停";}
   else StatusText.Text=link.Enabled?"自动钓鱼运行中":s.Ready?"钓点已识别":"等待进入钓点";
   ReasonText.Text=s.Error.Length>0?s.Error:link.Error.Length>0?link.Error:link.Enabled?s.Reason:s.Ready?"准备好后点击「开始钓鱼」。":"请进入钓鱼地图。";
   StatsText.Text=$"鱼：{(s.FishId>0?s.FishId.ToString():"未上钩")}　血量：{s.FishHp:0}　剩余：{s.TimeRemaining:0} 秒　确认收获：{s.Catches}";
@@ -81,9 +127,19 @@ public partial class FishingWindow:Window
   GaugeBar.Value=Math.Clamp(s.Gauge*100,0,100);GaugeText.Text=$"{s.Gauge*100:0}% · 当前档位 {s.CastGrade}";
   NetworkText.Text="网络："+s.Network+(s.NetworkPending?$"（等待 {s.NetworkWaitSeconds:0.0} 秒）":"");
   ActionText.Text=$"阶段：{StateName(s.State)}　操作：{ActionName(s.LastAction)}　共 {s.ActionCount} 次";
-  StartButton.IsEnabled=!link.Enabled&&!connecting&&s.Ready&&!s.NetworkPending&&s.State!="Auto";StopButton.IsEnabled=link.Enabled;
+  StartButton.IsEnabled=!link.Enabled&&!connecting&&!starting&&s.Ready&&!s.NetworkPending&&s.State!="Auto";StopButton.IsEnabled=link.Enabled;
  }
  private static string StateName(string s)=>s switch{"None"=>"准备抛竿","Casting"=>"蓄力抛竿","WaitingForBite"=>"等待咬钩","BiteDetected"=>"提竿","Fighting"=>"收线","Pause"=>"波次间隔","Caught"=>"收获结算","Auto"=>"游戏内自动钓鱼",_=>"未就绪"};
  private static string ActionName(string s)=>s switch{"CastPress"=>"开始蓄力","CastRelease"=>"释放抛竿","Hook"=>"提竿","FightClick"=>"收线点击","HoldPress"=>"按住收线","HoldRelease"=>"松开收线","ClosePopup"=>"确认弹窗","SellFish"=>"按保留规则出售鱼","ApproachWater"=>"走向可钓区域","UseBait"=>"使用一份鱼饵","TravelLobby"=>"前往钓鱼大厅","TravelReturn"=>"返回原钓场",_=>"尚未操作"};
- private void OnClosing(object? sender,CancelEventArgs e){closing=true;timer.Stop();link.Dispose();language?.Dispose();}
+ private void OnClosing(object? sender,CancelEventArgs e)
+ {
+  if(closing)return;e.Cancel=true;closing=true;lifetime.Cancel();timer.Stop();link.RequestStop();
+  FishingDiagnostics.Write(root,"ui.closing");shutdownTask=FinishCloseAsync();
+ }
+ private async Task FinishCloseAsync()
+ {
+  var release=QueueControl(()=>link.Dispose());
+  if(await Task.WhenAny(release,Task.Delay(2000))!=release)FishingDiagnostics.Write(root,"ui.close.lease-expiry-fallback");
+  language?.Dispose();Close();
+ }
 }

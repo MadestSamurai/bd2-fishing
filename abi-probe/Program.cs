@@ -5,7 +5,7 @@ var managed=Path.GetFullPath(args[0]);var hookPath=Path.GetFullPath(args[1]);Ass
 AppDomain.CurrentDomain.AssemblyResolve+=(_,e)=>{var name=new AssemblyName(e.Name).Name;if(name=="0Harmony"&&hook!=null){using var s=hook.GetManifestResourceStream("BD2Fishing.Harmony.dll")!;using var b=new MemoryStream();s.CopyTo(b);return Assembly.Load(b.ToArray());}var file=Path.Combine(managed,name+".dll");return File.Exists(file)?Assembly.LoadFrom(file):null;};
 hook=Assembly.LoadFrom(hookPath);var types=hook.GetTypes();int assertions=0;
 void Check(bool ok,string message){assertions++;if(!ok)throw new Exception(message);}
-Check(hook.GetName().Name=="BD2Fishing.Runtime10","identity");
+Check(System.Text.RegularExpressions.Regex.IsMatch(hook.GetName().Name??"", @"^BD2Fishing\.Runtime10\.Hot\.[A-F0-9]{12}$"),"payload-specific runtime identity");
 Check(!types.Any(t=>new[]{"Sichuan","Watcher","Golden","Mirror","ReplayCapture"}.Any(n=>(t.FullName??"").Contains(n))),"unrelated type closure");
 var identity=hook.GetType("BD2Fishing.FishingIdentity")!;var game=Assembly.LoadFrom(Path.Combine(managed,"Assembly-CSharp.dll"));
 var flags=BindingFlags.Static|BindingFlags.NonPublic;
@@ -156,5 +156,5 @@ foreach(var changedField in new[]{("Count",0),("Id",2),("Type",56)})
 }
 Check(!(bool)validBait.Invoke(null,new object?[]{null})!,"bait rejects absent concrete item");
 foreach(var a in hook.GetReferencedAssemblies())Check(a.Name=="0Harmony"||File.Exists(Path.Combine(managed,a.Name+".dll")),"missing dependency "+a.Name);
-Check(hook.GetName().Name==(string?)hook.GetType("BD2Fishing.FishingIdentity")!.GetField("RuntimeName")!.GetRawConstantValue(),"compiled assembly matches declared runtime identity");
+Check(hook.GetName().Name!.StartsWith((string)identity.GetField("RuntimeName")!.GetRawConstantValue()!+".Hot.",StringComparison.Ordinal),"compiled assembly belongs to declared runtime family");
 Console.WriteLine(JsonSerializer.Serialize(new{status="pass",assertions,members,hookTypes=types.Length,responseHandlers=handlers.Count,gameRequests=0,injection=false}));

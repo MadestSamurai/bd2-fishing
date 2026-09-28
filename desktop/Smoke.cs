@@ -10,29 +10,29 @@ public partial class FishingWindow
  public async Task SmokeAsync(string evidence)
  {
   LanguageBox.SelectedIndex=0;language!.Select("zh-CN");
-  smoke=true;timer.Stop();var checks=new List<string>();void Check(bool value,string name){if(!value)throw new Exception(name);checks.Add(name);}
+  TestTransport.Start(root,FishingIdentity.LiveEntries);smoke=true;timer.Stop();var checks=new List<string>();void Check(bool value,string name){if(!value)throw new Exception(name);checks.Add(name);}
   Show();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
   Check(!StartButton.IsEnabled,"start disabled before snapshot");Check(IntervalBox.Text=="1000"&&CastBox.Text=="90","defaults");Check(AutoSellBox.IsChecked==true,"automatic sale default visible");Check(AutoBaitBox.IsChecked==true,"automatic bait default visible");
   Check(AutoMapBox.IsChecked==true,"map renewal default visible");
   Check(KeepLegendaryBox.IsChecked==true && KeepLockedBox.IsChecked==true && KeepUnknownBox.IsChecked==true,"three independent protections enabled by default");
   Check((string)AutoSellBox.Content=="背包满自动出售" && (string)KeepLegendaryBox.Content=="保留全部传说鱼" && (string)KeepLockedBox.Content=="保留全部锁定鱼" && (string)KeepUnknownBox.Content=="保留资料不明的鱼","four independent labels");
   var s=new FishingSnapshot{Ready=true,CanCast=true,ProcessId=1234,CapturedUtcTicks=DateTime.UtcNow.Ticks,State="Fighting",FishId=101,FishHp=150,TimeRemaining=32,Reason="等待有效命中区",Network="FishingBiteStart error=0 accepted=True"};
-  FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(StartButton.IsEnabled,"ready enables start");
-  StartClick(this,new RoutedEventArgs());Check(link.Enabled,"start writes lease");
+  TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(StartButton.IsEnabled,"ready enables start");
+  await StartAsync();Check(link.Enabled,"start writes lease");
   var c=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;Check(c.Enabled&&c.Valid(DateTime.UtcNow.Ticks,1234),"lease valid and pid bound");
-  CastBox.Text="99";SettingsChanged(this,new RoutedEventArgs());Check(SettingsHint.Foreground==Brushes.Firebrick,"invalid gauge shown");CastBox.Text="90";
-  IntervalBox.Text="500";SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.NextCastMilliseconds==500,"live settings saved");
+  CastBox.Text="99";SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(SettingsHint.Foreground==Brushes.Firebrick,"invalid gauge shown");CastBox.Text="90";
+  IntervalBox.Text="500";SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.NextCastMilliseconds==500,"live settings saved");
   Check(c.AutoSell,"enabled sale included in lease");
   Check(c.Retention.KeepLocked==true&&c.AutoApproach,"safe retained-fish default and enabled approach lease");
-  AutoApproachBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoApproach,"approach can be disabled immediately");
-  AutoApproachBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoApproach,"approach choice persists");
+  AutoApproachBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoApproach,"approach can be disabled immediately");
+  AutoApproachBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoApproach,"approach choice persists");
 
-  AutoSellBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoSell,"sale can be disabled live");
-  AutoSellBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoSell,"sale preference persisted");
+  AutoSellBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoSell,"sale can be disabled live");
+  AutoSellBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoSell,"sale preference persisted");
   foreach(var sell in new[]{false,true})foreach(var legendary in new[]{true,false})foreach(var locked in new[]{true,false})foreach(var unknown in new[]{true,false})
   {
    AutoSellBox.IsChecked=sell;KeepLegendaryBox.IsChecked=legendary;KeepLockedBox.IsChecked=locked;KeepUnknownBox.IsChecked=unknown;
-   var saved=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!;
+   await controlQueue;var saved=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!;
    var live=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;
    Check(saved.AutoSell==sell && saved.Retention.KeepLegendary==legendary && saved.Retention.KeepLocked==locked && saved.Retention.KeepUnknown==unknown,"independent retention settings persisted");
    Check(live.AutoSell==sell && live.Retention.KeepLegendary==legendary && live.Retention.KeepLocked==locked && live.Retention.KeepUnknown==unknown,"independent retention settings sent live");
@@ -48,26 +48,26 @@ public partial class FishingWindow
   UpdateSpecies(new[]{new FishingSpeciesSummary{FishId=101,Name="示例鱼甲",Count=3,MinSize=100,MaxSize=200},new FishingSpeciesSummary{FishId=202,Name="示例鱼乙",Count=2,MinSize=90,MaxSize=180}});
   SpeciesBox.SelectedIndex=0;SizeModeBox.SelectedIndex=(int)FishingSizeMode.Both;
   SpeciesBox.SelectedIndex=1;SizeModeBox.SelectedIndex=(int)FishingSizeMode.Maximum;
-  var rules=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.Retention.SizeRules;
+  await controlQueue;var rules=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.Retention.SizeRules;
   Check(rules.Single(r=>r.FishId==101).Mode==FishingSizeMode.Both && rules.Single(r=>r.FishId==202).Mode==FishingSizeMode.Maximum,"species have independent size choices");
   UpdateSpecies(Array.Empty<FishingSpeciesSummary>());
   Check(Settings().Retention.SizeRules.Length==2,"absent species retain saved rules");
   var reopenRoot=Path.Combine(root,"reopen");FishingJson.Write(Path.Combine(reopenRoot,"settings.json"),FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!);
   var reopened=new FishingWindow(reopenRoot);
   Check(reopened.AutoSellBox.IsChecked==true && reopened.KeepLegendaryBox.IsChecked==false && reopened.KeepLockedBox.IsChecked==false && reopened.KeepUnknownBox.IsChecked==false,"reopened window restores independent options");
-  Check(reopened.Settings().Retention.SizeRules.Length==2,"reopened window restores species rules");reopened.Close();
+  Check(reopened.Settings().Retention.SizeRules.Length==2,"reopened window restores species rules");reopened.Close();await reopened.shutdownTask;
   var legacyRoot=Path.Combine(root,"legacy");Directory.CreateDirectory(legacyRoot);File.WriteAllText(Path.Combine(legacyRoot,"settings.json"),"{\"KeepLegendaryAndLocked\":false}");
-  var legacy=new FishingWindow(legacyRoot);Check(legacy.AutoSellBox.IsChecked==true && legacy.KeepLegendaryBox.IsChecked==true && legacy.KeepLockedBox.IsChecked==true && legacy.KeepUnknownBox.IsChecked==true,"old combined opt-out does not disable new protections");legacy.Close();
+  var legacy=new FishingWindow(legacyRoot);Check(legacy.AutoSellBox.IsChecked==true && legacy.KeepLegendaryBox.IsChecked==true && legacy.KeepLockedBox.IsChecked==true && legacy.KeepUnknownBox.IsChecked==true,"old combined opt-out does not disable new protections");legacy.Close();await legacy.shutdownTask;
   Check(c.AutoMapRenewal,"map renewal included in lease");
-  AutoMapBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoMapRenewal,"map renewal can be disabled live");
-  AutoMapBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoMapRenewal,"map renewal preference persisted");
+  AutoMapBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoMapRenewal,"map renewal can be disabled live");
+  AutoMapBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoMapRenewal,"map renewal preference persisted");
   Check(c.AutoBait,"automatic bait included in lease");
-  AutoBaitBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoBait,"bait disabled live");
-  AutoBaitBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoBait,"bait preference persisted");
+  AutoBaitBox.IsChecked=false;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(!FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!.AutoBait,"bait disabled live");
+  AutoBaitBox.IsChecked=true;SettingsChanged(this,new RoutedEventArgs());await controlQueue;Check(FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))!.AutoBait,"bait preference persisted");
   s.BaitReady=true;s.BaitCount=27;s.BaitActive=true;s.BaitRemainingSeconds=115;s.BaitUsedCount=3;s.BaitStatus="增益生效中，不重复消耗鱼饵";
   s.BagCount=200;s.BagCapacity=200;s.SellableCount=180;s.ProtectedFishCount=20;s.SoldCount=100;s.SaleStatus="已确认出售 100 条，保留鱼回读一致";
   s.MapRenewalStatus="地图剩余 05:34:17，剩余 5 分钟时往返换图";s.MapRenewals=1;
-  s.Gauge=.88;s.LastAction="FightClick";FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();UpdateLayout();
+  s.Gauge=.88;s.LastAction="FightClick";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();UpdateLayout();
   Check(InventoryText.Text.Contains("保留：20") && SaleText.Text.Contains("100"),"inventory and confirmed sale visible");
   Check(BaitText.Text.Contains("27 份") && BaitText.Text.Contains("115 秒") && BaitText.Text.Contains("使用：3"),"bait quantity duration and confirmed usage visible");
   Check(MapText.Text.Contains("05:34:17")&&MapText.Text.Contains("1 次"),"map countdown and completed round trips visible");
@@ -76,19 +76,19 @@ public partial class FishingWindow
   var baitPoint=AutoMapBox.TranslatePoint(new Point(0,0),ContentScroll);
   Check(ContentScroll.ScrollableHeight>0 && baitPoint.Y>=0 && baitPoint.Y+AutoMapBox.ActualHeight<=ContentScroll.ActualHeight,"small window scroll reaches map switch");Capture("window-small-settings.png");
   var ownerBeforeLanguage=link.OwnerId;var retainedBeforeLanguage=Settings().Retention.Fingerprint();
-  LanguageBox.SelectedIndex=1;Refresh();UpdateLayout();
+  LanguageBox.SelectedIndex=1;await RefreshAsync();UpdateLayout();
   Check(StartButton.Content.ToString()=="Start fishing" && StopButton.Content.ToString()=="Stop fishing","English action labels");
   Check(ReasonText.Text.All(ch=>ch<0x4E00 || ch>0x9FFF) && BaitText.Text.Contains("Buff time left: 115 s"),"live evidence displayed in English: "+ReasonText.Text+" / "+BaitText.Text);
   Check(link.Enabled && link.OwnerId==ownerBeforeLanguage && Settings().Retention.Fingerprint()==retainedBeforeLanguage,"live language switch preserves active owner and retention");
   Check(LanguagePreference.Read(root)=="en-US" && SizeModeBox.Items.Cast<string>().Contains("MAX and MIN"),"English preference and MAX MIN choices");
   Width=790;Height=850;ContentScroll.ScrollToTop();UpdateLayout();Capture("window-en.png");
   Width=650;Height=540;UpdateLayout();Capture("window-en-small.png");ContentScroll.ScrollToBottom();await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();Capture("window-en-small-settings.png");
-  LanguageBox.SelectedIndex=0;Refresh();Check(StartButton.Content.ToString()=="开始钓鱼" && link.OwnerId==ownerBeforeLanguage,"switch back restores Chinese without restarting");
-  s.MapChangePending=true;s.Reason="确认收获；昼夜切换排队，先完成本竿";s.CapturedUtcTicks=DateTime.UtcNow.Ticks;FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(link.Enabled && ReasonText.Text.Contains("昼夜切换排队"),"queued day/night keeps automation and explains settlement");
-  s.MapChangePending=false;s.Busy=true;s.State="None";s.Reason="等待场景切换";FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(link.Enabled && StopButton.IsEnabled,"scene loading keeps lease and stop available");
-  s.Busy=false;s.Reason="准备下一竿";FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(link.Enabled && ReasonText.Text=="准备下一竿","scene completion shows automatic continuation");
-  s.OwnerId=link.OwnerId;s.Error="网络响应超过 30 秒";FishingJson.Write(Path.Combine(root,"latest.json"),s);Refresh();Check(!link.Enabled,"network error stops automation");
-  Close();c=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;Check(!c.Enabled&&c.UntilUtcTicks==0,"close revokes lease");
+  LanguageBox.SelectedIndex=0;await RefreshAsync();Check(StartButton.Content.ToString()=="开始钓鱼" && link.OwnerId==ownerBeforeLanguage,"switch back restores Chinese without restarting");
+  s.MapChangePending=true;s.Reason="确认收获；昼夜切换排队，先完成本竿";s.CapturedUtcTicks=DateTime.UtcNow.Ticks;TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && ReasonText.Text.Contains("昼夜切换排队"),"queued day/night keeps automation and explains settlement");
+  s.MapChangePending=false;s.Busy=true;s.State="None";s.Reason="等待场景切换";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && StopButton.IsEnabled,"scene loading keeps lease and stop available");
+  s.Busy=false;s.Reason="准备下一竿";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && ReasonText.Text=="准备下一竿","scene completion shows automatic continuation");
+  s.OwnerId=link.OwnerId;s.Error="网络响应超过 30 秒";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(!link.Enabled,"network error stops automation");await controlQueue;
+  await controlQueue;Close();await shutdownTask;c=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;Check(!c.Enabled&&c.UntilUtcTicks==0,"close revokes lease");
   FishingJson.Write(Path.Combine(evidence,"results.json"),new{status="pass",assertions=checks});
   void Capture(string name){var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(evidence,name));png.Save(file);}
  }

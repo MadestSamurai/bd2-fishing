@@ -5,7 +5,7 @@
 - [ ] 修改 `Directory.Build.props` 的版本，并更新 README 下载文件名与发布说明。
 - [ ] 升级 .NET 时同步检查桌面项目的 `RuntimeFrameworkVersion`、`Directory.Build.targets` 中链接器版本与依赖锁文件，避免不同 SDK 的隐式依赖漂移。
 - [ ] 执行 `build.ps1 -Locked`，确认决策／保护与兼容测试通过。
-- [ ] 执行 `package.ps1 -Locked`，确认 Portable／Lite 两个单 EXE、运行库模式与 WPF 离线检查均通过。
+- [ ] 执行 `package.ps1 -Locked`，确认 Portable／Lite 两个单 EXE、运行库模式与 WPF 离线检查均通过；两版的 `--connection-smoke` 必须通过，覆盖组件缺席、慢连接、停止和关闭期间的界面响应。
 - [ ] 如修改 Hook，针对合法安装的当前客户端运行 `compatibility-cli check` 与 `abi-probe`；可用旧版则一并验证。
 - [ ] 确认提交清单仅含源码、接口契约、文档、依赖锁文件和许可证。禁止提交客户端 DLL、采集文件、诊断、连接状态或账号信息。
 - [ ] 审阅 `docs/RELEASE_NOTES.md`：面向使用者说明功能变化、Portable／Lite 区别与升级步骤。Runtime 编号、接口实现和内部验证记录保留在维护文档中，不写入 Release 正文。
@@ -21,7 +21,7 @@
 
 ```powershell
 # 不注入、不连接服务器，只检查元数据并编译内存组件。
-BD2Fishing-0.4.0-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
+BD2Fishing-0.4.3-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
 ```
 
 维护者的详细检查：

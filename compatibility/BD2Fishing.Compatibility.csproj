@@ -9,4 +9,4 @@
 <EmbeddedResource Include="../shared/*.cs" LogicalName="Hook.%(Filename)%(Extension)" />
 <EmbeddedResource Include="contract.json" Condition="Exists('contract.json')" LogicalName="BD2Fishing.Contract.json" />
 </ItemGroup>
-</Project>
+<ItemGroup><EmbeddedResource Include="../ipc/common/*.cs" LogicalName="Hook.%(Filename)%(Extension)"/><EmbeddedResource Include="../ipc/runtime/*.cs" LogicalName="Hook.%(Filename)%(Extension)"/></ItemGroup></Project>

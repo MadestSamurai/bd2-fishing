@@ -15,50 +15,74 @@ public sealed class FishingConnectionState
 public sealed class FishingConnection
 {
     private readonly string root;
-    public FishingConnection(string? root=null){this.root=root??FishingIdentity.DataRoot;}
+    public FishingConnection(string? root=null){this.root=root??FishingIdentity.DataRoot;BD2.LocalIpc.DesktopFiles.Configure(this.root,FishingIdentity.LiveEntries);}
     public static bool SameProcess(FishingConnectionState s,int pid,long start)=>s.ProcessId==pid&&s.ProcessStartTicks==start;
     public static bool Fresh(FishingRuntimeStatus? status,int pid,DateTime since)=>status!=null&&status.ProcessId==pid&&status.Runtime==FishingIdentity.RuntimeName&&DateTime.TryParse(status.AtUtc,null,DateTimeStyles.RoundtripKind,out var when)&&when>=since&&when<=DateTime.UtcNow.AddSeconds(2);
-    public string Connect(Action<string>? progress=null)
+    public string Connect(Action<string>? progress=null,bool daily=false,CancellationToken cancellationToken=default)
     {
-        using var game=FindGame();int pid=game.Id;long start=game.StartTime.ToUniversalTime().Ticks;
-        string fingerprint=HookCompiler.ToolFingerprint;var path=Path.Combine(root,"connection.json");
-        var old=FishingJson.Read<FishingConnectionState>(path);
-        if(old!=null&&SameProcess(old,pid,start))
+        using var trace=new FishingConnectionTrace(root,progress);
+        try
         {
-            if(old.ToolFingerprint!=fingerprint)throw new InvalidOperationException("游戏内已加载另一版钓鱼组件，请正常重启游戏后再连接。");
-            var report=FishingJson.Read<FishingRuntimeStatus>(Path.Combine(root,"runtime.json"));
-            if(Fresh(report,pid,DateTime.UtcNow.AddSeconds(-5))&&report!.State=="active")return $"已连接游戏 {pid} · 钓鱼独立组件";
-            if(report?.ProcessId==pid&&report.State=="error")throw new InvalidOperationException(report.Error);
-            throw new InvalidOperationException("此游戏进程已有连接记录，但组件未就绪。请等待游戏加载；仍无状态时正常重启游戏后再连接。");
+        cancellationToken.ThrowIfCancellationRequested();
+        trace.Stage("process.find");
+        using var game=FindGame();int pid=game.Id;long start=game.StartTime.ToUniversalTime().Ticks;
+        string fingerprint=HookCompiler.ToolFingerprint+(daily?".daily":"");var path=Path.Combine(root,"connection.json");
+        trace.Stage("process.found");
+        FishingDiagnostics.Write(root,"process.identity",$"pid={pid}; startedUtcTicks={start}; tool64={Environment.Is64BitProcess}; os64={Environment.Is64BitOperatingSystem}");
+        var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,pid,start);
+        trace.Stage("pipe.probe");
+        try
+        {
+            if(pipe.Fingerprint()==fingerprint)
+            {
+                var report=FishingJson.Read<FishingRuntimeStatus>(Path.Combine(root,"runtime.json"));
+                if(Fresh(report,pid,DateTime.UtcNow.AddSeconds(-5))&&report!.State=="active")
+                {cancellationToken.ThrowIfCancellationRequested();pipe.Open(fingerprint);trace.Stage("connected.reused");return $"已连接游戏 {pid} · 本机管道";}
+            }
         }
+        catch(BD2.LocalIpc.LeaseRevokedException){}
+        catch(TimeoutException){}
+        catch(IOException){}
+        cancellationToken.ThrowIfCancellationRequested();
         // Resolve the required interfaces and compile against installed metadata before any injection.
         var exe=game.MainModule?.FileName??throw new InvalidOperationException("无法读取游戏路径，请使用与游戏相同的权限运行。");
         var client=Path.Combine(Path.GetDirectoryName(exe)!,Path.GetFileNameWithoutExtension(exe)+"_Data","Managed","Assembly-CSharp.dll");
-        progress?.Invoke("正在识别钓鱼接口并生成适配组件，首次连接可能需要数秒…");
+        trace.Stage("compatibility.prepare","正在识别钓鱼接口并生成适配组件，首次连接可能需要数秒…");
         PreparedHook prepared;
-        try { prepared=HookCompiler.Prepare(Path.GetDirectoryName(client)!);FishingJson.Write(Path.Combine(root,"compatibility.json"),prepared.Report); }
+        try { prepared=HookCompiler.Prepare(Path.GetDirectoryName(client)!,daily:daily);FishingJson.Write(Path.Combine(root,"compatibility.json"),prepared.Report); }
         catch(CompatibilityException ex) { FishingJson.Write(Path.Combine(root,"compatibility.json"),ex.Report);throw; }
         catch(Exception ex) { FishingJson.Write(Path.Combine(root,"compatibility.json"),new{Status="unsupported",Error=ex.Message,Injection=false});throw; }
+        cancellationToken.ThrowIfCancellationRequested();
+        trace.Stage("compatibility.ready");
         var payload=prepared.Payload;string sha=Convert.ToHexString(SHA256.HashData(payload));
         if(game.HasExited || game.StartTime.ToUniversalTime().Ticks!=start)throw new InvalidOperationException("游戏进程已变化，请重新连接。");
-        progress?.Invoke("接口检查通过，正在连接独立钓鱼组件…");
+        trace.Stage("injector.open","接口检查通过，正在连接独立钓鱼组件…");
         var state=new FishingConnectionState{ProcessId=pid,ProcessStartTicks=start,HookSha256=sha,ToolFingerprint=fingerprint};
-        using var injector=new Injector(pid);
+        using var injector=new Injector(pid){DiagnosticStage=stage=>trace.Stage("injector."+stage)};
         FishingJson.Write(path,state); // In-flight marker prevents a blind duplicate load after an ambiguous injector failure.
         var attempt=DateTime.UtcNow;
+        cancellationToken.ThrowIfCancellationRequested();
+        trace.Stage("injector.invoke");
         state.Address=injector.Inject(payload,"BD2Fishing.Runtime","Loader","Load").ToInt64();
+        trace.Stage("injector.returned");
+        cancellationToken.ThrowIfCancellationRequested();
         FishingJson.Write(path,state);
-        for(int i=0;i<50;i++)
+        trace.Stage("handoff.wait");
+        var deadline=DateTime.UtcNow.AddSeconds(35);
+        while(DateTime.UtcNow<deadline)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var report=FishingJson.Read<FishingRuntimeStatus>(Path.Combine(root,"runtime.json"));
             if(Fresh(report,pid,attempt))
             {
                 if(report!.State=="error")throw new InvalidOperationException(report.Error);
-                if(report.State=="active")return $"已连接游戏 {pid} · 钓鱼独立组件";
+                if(report.State=="active"){pipe.Open(fingerprint);trace.Stage("connected.ready");return $"已连接游戏 {pid} · 本机管道";}
             }
             Thread.Sleep(100);
         }
-        throw new InvalidOperationException("组件尚未返回连接状态，请等待游戏完成加载。请勿反复注入；必要时正常重启游戏。");
+        throw new InvalidOperationException("组件交接尚未完成，请等待游戏界面恢复或当前操作结算后重新连接；游戏可以保持运行。");
+        }
+        catch(Exception ex){trace.Fail(ex);throw;}
     }
     public static Process FindGame()
     {

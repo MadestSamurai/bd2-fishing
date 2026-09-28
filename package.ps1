@@ -1,4 +1,4 @@
-﻿param([string]$Version='', [switch]$Locked)
+param([string]$Version='', [switch]$Locked)
 $ErrorActionPreference='Stop'
 $declared=([xml](Get-Content (Join-Path $PSScriptRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if(!$Version){$Version=$declared}
@@ -32,6 +32,9 @@ foreach($flavor in @('Portable','Lite')){
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'results.json') -Raw | ConvertFrom-Json
     if($ui.status -ne 'pass'){throw 'Packaged UI regression failed'}
+    RunCheck @('--connection-smoke',('"'+$check+'"'))
+    $connectionCheck=Get-Content (Join-Path $check 'connection-smoke.json') -Raw | ConvertFrom-Json
+    if($connectionCheck.status -ne 'pass'){throw 'Packaged cold connection responsiveness failed'}
     # Check actual host configuration, not just the filename or publish flags.
     $configs=@(Get-ChildItem -LiteralPath (Join-Path $buildArtifacts 'bin') -Recurse -File -Filter 'BD2Fishing.runtimeconfig.json')
     if($configs.Count -ne 1){throw 'Runtime config not unique'}
@@ -53,7 +56,7 @@ foreach($flavor in @('Portable','Lite')){
 }
 if($flavors[1].exeBytes -ge $flavors[0].exeBytes){throw 'Lite must be smaller than Portable'}
 @(foreach($file in $assets){"$((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"}) | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
-[ordered]@{version=$Version;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;languages=@('zh-CN','en-US');gameLibrariesBundled=$false;clientVersionLock=$false;runtimeVerification='source_implemented_pending_runtime'} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
+[ordered]@{version=$Version;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;languages=@('zh-CN','en-US');gameLibrariesBundled=$false;clientVersionLock=$false} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 $repoRoot=[IO.Path]::GetFullPath($PSScriptRoot)+[IO.Path]::DirectorySeparatorChar
 if(!([IO.Path]::GetFullPath($output)).StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase) -or !$destination.StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase)){throw 'Output paths outside repository'}
 New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null

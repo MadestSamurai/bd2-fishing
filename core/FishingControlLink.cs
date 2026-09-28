@@ -3,9 +3,9 @@ namespace BD2Fishing;
 public static class FishingJson
 {
  public static T? Read<T>(string path) where T:class
- {try{using var s=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);return JsonSerializer.Deserialize<T>(s);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException){return null;}}
+ {try{if(BD2.LocalIpc.DesktopFiles.Read(path,out var live))return live==null?null:JsonSerializer.Deserialize<T>(live);using var s=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);return JsonSerializer.Deserialize<T>(s);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException or TimeoutException or ObjectDisposedException){if(BD2.LocalIpc.DesktopFiles.Handles(path))FishingDiagnostics.Throttled(Path.GetDirectoryName(path)!,"read."+Path.GetFileName(path),e);return null;}}
  public static void Write<T>(string path,T value)
- {var dir=Path.GetDirectoryName(path)!;Directory.CreateDirectory(dir);var tmp=Path.Combine(dir,Guid.NewGuid().ToString("N")+".tmp");try{File.WriteAllText(tmp,JsonSerializer.Serialize(value));File.Move(tmp,path,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}}
+ {if(BD2.LocalIpc.DesktopFiles.Write(path,JsonSerializer.SerializeToUtf8Bytes(value)))return;var dir=Path.GetDirectoryName(path)!;Directory.CreateDirectory(dir);var tmp=Path.Combine(dir,Guid.NewGuid().ToString("N")+".tmp");try{File.WriteAllText(tmp,JsonSerializer.Serialize(value));File.Move(tmp,path,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}}
 }
 public sealed class FishingSettings
 {
@@ -24,22 +24,53 @@ public sealed class FishingSettings
 }
 public sealed class FishingControlLink:IDisposable
 {
- private readonly object sync=new();private readonly Timer timer;private readonly string root;
- private FishingControl command=new();private bool disposed;
- public string Error {get;private set;}="";
+ private readonly object sync=new(),sendSync=new();private readonly Timer timer;private readonly string root;
+ private FishingControl command=new();private bool disposed;private long revision,stopVersion;private string error="";
+ public string Error {get{lock(sync)return error;}}
  public string OwnerId {get{lock(sync)return command.OwnerId;}}
  public bool Enabled {get{lock(sync)return command.Enabled;}}
- public FishingControlLink(string root){this.root=root;timer=new(_=>Pulse(),null,500,500);}
+ public long StopVersion {get{lock(sync)return stopVersion;}}
+ public FishingControlLink(string root){this.root=root;BD2.LocalIpc.DesktopFiles.Configure(root,FishingIdentity.LiveEntries);timer=new(_=>Pulse(),null,500,500);}
  public void Configure(FishingSettings s)
  {
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))throw new ArgumentException("下一竿间隔为 0–60000 毫秒，蓄力为 5–95%。");
   var retention=(s.Retention??new()).Clone();
-  lock(sync){FishingJson.Write(Path.Combine(root,"settings.json"),s);command.NextCastMilliseconds=s.NextCastMilliseconds;command.CastGauge=s.CastGauge;command.PreferWeak=s.PreferWeak;command.AutoSell=s.AutoSell;command.Retention=retention;command.AutoApproach=s.AutoApproach;command.AutoBait=s.AutoBait;command.AutoMapRenewal=s.AutoMapRenewal;if(command.Enabled)Write();}
+  lock(sendSync)
+  {
+   lock(sync)if(disposed)throw new ObjectDisposedException(nameof(FishingControlLink));
+   FishingJson.Write(Path.Combine(root,"settings.json"),s);
+   bool publish;lock(sync){command.NextCastMilliseconds=s.NextCastMilliseconds;command.CastGauge=s.CastGauge;command.PreferWeak=s.PreferWeak;command.AutoSell=s.AutoSell;command.Retention=retention;command.AutoApproach=s.AutoApproach;command.AutoBait=s.AutoBait;command.AutoMapRenewal=s.AutoMapRenewal;revision++;publish=command.Enabled;}
+   if(publish)PublishLocked();
+  }
  }
- public void Start(int pid){lock(sync){if(disposed)throw new ObjectDisposedException(nameof(FishingControlLink));command.OwnerId=Guid.NewGuid().ToString("N");command.ProcessId=pid;command.Enabled=true;try{Write();}catch{command.Enabled=false;throw;}}}
- public void Stop(){lock(sync){command.Enabled=false;Write();}}
- private void Write(){command.UntilUtcTicks=command.Enabled?DateTime.UtcNow.AddSeconds(10).Ticks:0;FishingJson.Write(Path.Combine(root,"control.json"),command);Error="";}
- private void Pulse(){lock(sync){if(disposed || !command.Enabled)return;try{Write();}catch(Exception e)when(e is IOException or UnauthorizedAccessException){Error=e.Message;}}}
- public void Dispose(){lock(sync){if(disposed)return;disposed=true;timer.Dispose();try{Stop();}catch(Exception e){Error=e.Message;}}}
+ public void Start(int pid,long? expectedStopVersion=null)
+ {
+  lock(sync){if(disposed)throw new ObjectDisposedException(nameof(FishingControlLink));if(expectedStopVersion.HasValue&&expectedStopVersion!=stopVersion)throw new OperationCanceledException();command.OwnerId=Guid.NewGuid().ToString("N");command.ProcessId=pid;command.Enabled=true;revision++;}
+  try{Publish();}catch{RequestStop();throw;}
+ }
+ // Local state can always be revoked without waiting for a pipe or a heartbeat.
+ public void RequestStop(){lock(sync){command.Enabled=false;stopVersion++;revision++;}}
+ public void Stop(){RequestStop();Publish();}
+ private void Publish(){lock(sendSync)PublishLocked();}
+ private void PublishLocked()
+ {
+  while(true)
+  {
+   FishingControl value;long sentRevision;
+   lock(sync){sentRevision=revision;value=JsonSerializer.Deserialize<FishingControl>(JsonSerializer.Serialize(command))!;value.UntilUtcTicks=value.Enabled?DateTime.UtcNow.AddSeconds(10).Ticks:0;}
+   FishingJson.Write(Path.Combine(root,"control.json"),value);
+   lock(sync){error="";if(sentRevision==revision)return;}
+   // A stop/settings change arrived during the write: immediately publish current state,
+   // never let an in-flight renewal be the final command after stopping.
+  }
+ }
+ private void Pulse()
+ {
+  if(!Monitor.TryEnter(sendSync))return;
+  try{lock(sync)if(disposed||!command.Enabled)return;PublishLocked();}
+  catch(Exception e){lock(sync){error=e.Message;if(e is BD2.LocalIpc.LeaseRevokedException){command.Enabled=false;revision++;}}FishingDiagnostics.Throttled(root,"heartbeat.failed",e);}
+  finally{Monitor.Exit(sendSync);}
+ }
+ public void Dispose(){lock(sync){if(disposed)return;disposed=true;command.Enabled=false;stopVersion++;revision++;}timer.Dispose();try{Publish();}catch(Exception e){lock(sync)error=e.Message;FishingDiagnostics.Throttled(root,"close.stop",e);}}
  public static bool Fresh(FishingSnapshot? s,DateTime now)=>s!=null && s.Schema==1 && s.Runtime==FishingIdentity.RuntimeName && s.ProcessId>0 && s.CapturedUtcTicks<=now.AddSeconds(2).Ticks && s.CapturedUtcTicks>=now.AddSeconds(-3).Ticks;
 }

@@ -11,6 +11,7 @@ namespace BD2Fishing.Runtime
         {using(var b=new MemoryStream()){new DataContractJsonSerializer(value.GetType()).WriteObject(b,value);WriteAtomically(path,b.ToArray());}}
         internal static void WriteAtomically(string path,byte[] value)
         {
+            if(BD2.LocalIpc.RuntimeFiles.Write(path,value))return;
             var directory=Path.GetDirectoryName(path);Directory.CreateDirectory(directory);var tmp=Path.Combine(directory,Guid.NewGuid().ToString("N")+".tmp");
             try{File.WriteAllBytes(tmp,value);if(File.Exists(path))File.Replace(tmp,path,null);else File.Move(tmp,path);}
             finally{if(File.Exists(tmp))File.Delete(tmp);}

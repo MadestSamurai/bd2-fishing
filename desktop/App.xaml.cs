@@ -10,6 +10,8 @@ public partial class App:Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException+=(_,a)=>FishingDiagnostics.Write(FishingIdentity.DataRoot,"dispatcher.unhandled",error:a.Exception);
+        AppDomain.CurrentDomain.UnhandledException+=(_,a)=>FishingDiagnostics.Write(FishingIdentity.DataRoot,"process.unhandled",error:a.ExceptionObject as Exception);
         if(e.Args.Length==2&&e.Args[0]=="--identity")
         {File.WriteAllText(e.Args[1],JsonSerializer.Serialize(new{runtime=FishingIdentity.RuntimeName,toolFingerprint=BD2Fishing.Compatibility.HookCompiler.ToolFingerprint,compatibility="local-interface-adaptation",version=typeof(App).Assembly.GetName().Version!.ToString(),defaultNextCastMs=1000,defaultCastGauge=0.9,defaultAutoSell=true,defaultKeepLegendary=true,defaultKeepLocked=true,defaultKeepUnknown=true,defaultAutoApproach=true,defaultAutoBait=true,defaultAutoMapRenewal=true,protectedLegendaryGrade=FishingSalePlan.LegendaryGrade}));Shutdown();return;}
         if(e.Args.Length==3&&e.Args[0]=="--check-client")
@@ -17,9 +19,9 @@ public partial class App:Application
             try { var result=await Task.Run(()=>BD2Fishing.Compatibility.HookCompiler.Prepare(e.Args[1]));File.WriteAllText(e.Args[2],JsonSerializer.Serialize(result.Report));Shutdown(); }
             catch(Exception ex){File.WriteAllText(e.Args[2],JsonSerializer.Serialize(new{Status="unsupported",Error=ex.ToString(),Injection=false}));Shutdown(1);}return;
         }
-        if(e.Args.Length==2&&e.Args[0]=="--smoke")
+        if(e.Args.Length==2&&(e.Args[0]=="--smoke"||e.Args[0]=="--connection-smoke"))
         {
-            try{Directory.CreateDirectory(e.Args[1]);var window=new FishingWindow(Path.Combine(Path.GetFullPath(e.Args[1]),"isolated",Guid.NewGuid().ToString("N")));MainWindow=window;await window.SmokeAsync(e.Args[1]);Shutdown(0);}
+            try{Directory.CreateDirectory(e.Args[1]);var window=new FishingWindow(Path.Combine(Path.GetFullPath(e.Args[1]),"isolated",Guid.NewGuid().ToString("N")));MainWindow=window;ShutdownMode=ShutdownMode.OnExplicitShutdown;if(e.Args[0]=="--connection-smoke")await window.ConnectionSmokeAsync(e.Args[1]);else await window.SmokeAsync(e.Args[1]);Shutdown(0);}
             catch(Exception ex){File.WriteAllText(Path.Combine(e.Args[1],"failure.txt"),ex.ToString());Shutdown(1);}return;
         }
         single=new Mutex(true,"Local\\BD2Fishing.Desktop",out bool first);

@@ -140,7 +140,7 @@
   "正在识别钓鱼接口并生成适配组件，首次连接可能需要数秒…": "Adapting to local fishing interfaces. First connection may take a few seconds…",
   "正在走向钓区，剩余 ": "Walking to the casting area; distance: ",
   "正在返回原钓场，等待新的入场时间": "Returning to the original map; awaiting a new entry time",
-  "正在连接钓鱼组件…": "Connecting the fishing component…",
+  "正在连接钓鱼组件…": "Connecting to the fishing component…",
   "此游戏进程已有连接记录，但组件未就绪。请等待游戏加载；仍无状态时正常重启游戏后再连接。": "This game process already has a connection record. Wait for loading; if no status appears, restart the game before reconnecting.",
   "没有可安全出售的鱼": "No fish can be sold under the current rules.",
   "波次间隔": "Between waves",
@@ -282,5 +282,13 @@
   "MIT 许可证保持不变。本说明不增加许可限制，也不承诺免责效果。": "The MIT License remains unchanged. This notice adds no license restrictions and does not promise immunity from liability.",
   "源码与官方下载（可选择复制）": "Official source and downloads (select to copy)",
   "关闭": "Close",
-  "BD2 钓鱼 · 0.4.1": "BD2 Fishing · 0.4.1"
+  "BD2 钓鱼 · 0.4.1": "BD2 Fishing · 0.4.1",
+  " · 本机管道": " · Local connection",
+  "组件交接尚未完成，请等待游戏界面恢复或当前操作结算后重新连接；游戏可以保持运行。": "Component handoff is still pending. Wait for the game UI or pending action to finish, then reconnect. You can keep the game running.",
+  "请重新连接本工具内置的连连看组件，游戏可以保持运行。": "Reconnect the built-in Sichuan component. You can keep the game running.",
+  "请先连接游戏。": "Connect to the game first.",
+  "日常执行器未激活，不能单独启动日常钓鱼组件。": "The daily executor is inactive. Start fishing through the daily workflow.",
+  "连接仍在进行，已等待 ": "Connection is still in progress; waiting for ",
+  " 秒；可打开诊断目录查看 connection.log。": " seconds. Open Diagnostics to view connection.log.",
+  "BD2 钓鱼 · 0.4.3": "BD2 Fishing · 0.4.3"
 }

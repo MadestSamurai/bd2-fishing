@@ -25,7 +25,7 @@ p=new();s=S();s.BagFull=true;Step(p,s);Check(Step(p,s,2000)==FishingAction.None,
 foreach(var mode in new[]{"modal","scene","unready"}){p=new();s=S("Fighting");s.WeakHit=true;if(mode=="modal")s.BlockReason="popup";if(mode=="scene")s.Busy=true;if(mode=="unready")s.Ready=false;Check(Step(p,s)==FishingAction.None,"gated "+mode);}
 var expired=C();expired.UntilUtcTicks=time;Check(!expired.Valid(time,123),"lease expires");Check(!C().Valid(time,999),"pid fence");var bad=C();bad.UntilUtcTicks=time+TimeSpan.FromDays(1).Ticks;Check(!bad.Valid(time,123),"reject long stale lease");Check(!FishingControl.ValidSettings(1000,double.NaN),"NaN rejected");
 var data=Path.Combine(Path.Combine(AppContext.BaseDirectory,"test-data"),"test-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(data);
-using(var link=new FishingControlLink(data)){link.Configure(new(){NextCastMilliseconds=321,CastGauge=.8});link.Start(123);var v=FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!;Check(v.Valid(DateTime.UtcNow.Ticks,123)&&v.NextCastMilliseconds==321,"atomic settings lease");link.Stop();Thread.Sleep(650);Check(!FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!.Enabled,"late renewal cannot rearm stopped run");link.Start(123);}
+TestTransport.Start(data,FishingIdentity.LiveEntries);using(var link=new FishingControlLink(data)){link.Configure(new(){NextCastMilliseconds=321,CastGauge=.8});link.Start(123);var v=FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!;Check(v.Valid(DateTime.UtcNow.Ticks,123)&&v.NextCastMilliseconds==321,"atomic settings lease");link.Stop();Thread.Sleep(650);Check(!FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!.Enabled,"late renewal cannot rearm stopped run");link.Start(123);}
 Check(!FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!.Enabled,"dispose revokes");
 p=new();s=S("Fighting");s.HoldActive=true;s.HoldInside=true;s.HoldStartHit=true;Step(p,s,100,true);s.HoldTracking=true;s.HoldStartHit=false;s.Freeze=true;Check(Step(p,s)==FishingAction.FightClick,"freeze can be cleared without dropping ongoing hold");
 var rng=new Random(73021);
@@ -44,11 +44,11 @@ bool lockedRejected=false;try{new FishingSaleProgress().Begin(unrestricted,time)
 Check(lockedRejected,"sale rejects locked candidate before verified unlock");
 foreach(var legend in new[]{false,true})foreach(var keep in new[]{false,true})foreach(var sell in new[]{false,true})
 {
- using(var link=new FishingControlLink(data))
+ TestTransport.Start(data,FishingIdentity.LiveEntries);using(var link=new FishingControlLink(data))
  {
   link.Configure(new(){AutoSell=sell,Retention=new FishingRetentionOptions{KeepLegendary=legend,KeepLocked=keep}});link.Start(123);
   var stored=FishingJson.Read<FishingSettings>(Path.Combine(data,"settings.json"))!;
-  using var stream=File.OpenRead(Path.Combine(data,"control.json"));
+  using var stream=new MemoryStream(TestTransport.Read(Path.Combine(data,"control.json")));
   var command=(FishingControl)new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(FishingControl)).ReadObject(stream)!;
   Check(stored.AutoSell==sell && stored.Retention.KeepLegendary==legend && stored.Retention.KeepLocked==keep && command.AutoSell==sell && command.Retention.KeepLegendary==legend && command.Retention.KeepLocked==keep,"independent options survive settings and runtime serialization");
  }

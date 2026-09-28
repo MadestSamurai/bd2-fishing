@@ -12,7 +12,7 @@ A standalone fishing assistant for the BrownDust II Windows client. Uses the gam
 
 ## Download
 
-Current version: **0.4.1**. Both editions have the same features and include Simplified Chinese / English.
+Current version: **0.4.3**. Both editions have the same features and include Simplified Chinese / English.
 
 | Edition | Runtime requirement | Recommended for |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 
 ## Quick start
 
-**Before upgrading:** pause and close the old assistant, restart the game normally, then connect with the new version.
+**Before upgrading:** pause and close the old assistant, then connect with the new version. Upgrading from 0.4.1 or earlier requires one normal game restart. When upgrading from 0.4.2 or the 0.4.3 test build, the game can stay open.
 
 1. Enter an unlocked fishing map and turn off the game’s built-in automatic fishing.
 2. Open the assistant, click **Connect game**, and wait for the fishing area to be recognized.
@@ -64,6 +64,8 @@ See [translation maintenance](docs/LOCALIZATION.md).
 
 Supports the official Windows x64 PC client, one game process at a time, with the same privilege level as the game. Mobile and Android emulator clients are not supported. First connection resolves local interfaces and builds the component, which may take a few seconds. Uncertain interface matches stop connection with a diagnostic; adaptation does not guarantee every future update will work without maintenance.
 
+Tools that support component handoff can update or switch within the same game process after pending actions finish, retaining settings and records. Live communication uses local named pipes. The daily scheduler manages its cooperating modules separately. Old components without handoff support require one game restart.
+
 Releases contain no game DLLs, resources, account inventories or private captures. Does not use built-in automatic fishing, buy supplies or unlock maps.
 
 ## Diagnostics and feedback
@@ -73,10 +75,10 @@ Settings and diagnostics are under `%LOCALAPPDATA%\BD2Fishing`; click **Open dia
 | File | Purpose |
 | --- | --- |
 | `compatibility.json` | Local interface matching and failures |
-| `runtime.json` / `latest.json` | Component state and latest fishing snapshot |
+| `connection.log` | Connection progress, waiting phases and failures, including before the component starts |
 | `runtime.log` | Actions, replies, inventory checks and map transitions |
 
-These files stay on your computer. An unconfirmed sale or bait request pauses rather than being blindly resent.
+These files stay on your computer. The window remains responsive during connection; check `connection.log` if it takes too long. If the diagnostics directory is not writable, connection logging falls back to `%TEMP%\BD2Fishing`. An unconfirmed sale or bait request pauses rather than being blindly resent.
 
 When reporting an issue, include the version, visible message and relevant log excerpts. Remove account information and personal paths first. Do not upload game DLLs, complete inventories or connection credentials.
 
@@ -89,7 +91,7 @@ Requires Windows x64, PowerShell and the .NET 8 SDK. Normal builds and regressio
 .\package.ps1 -Locked
 ```
 
-Assets are written to `dist/v<version>/`. Packaging checks both runtime configurations and runs UI checks.
+Assets are written to `dist/v<version>/`. Packaging checks both runtime configurations, runs UI checks and verifies connection responsiveness while the component is unavailable.
 
 [Development and release workflow](docs/RELEASING.md) · [Documentation and release format](docs/PUBLICATION_STYLE.md) · [Current release notes](docs/RELEASE_NOTES.md)
 

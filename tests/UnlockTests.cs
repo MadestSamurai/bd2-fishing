@@ -36,7 +36,7 @@ static class UnlockTests
   Check(restartedAuthorization.Valid(command,now,12) && (string?)capturedOwner.GetValue(restartedAuthorization)=="two","restart can establish its own fresh authorization");
   command.OwnerId="one";Check(!authorization.Valid(command,now+TimeSpan.FromSeconds(11).Ticks,12),"expired lease cannot continue batch");
   var data=Path.Combine(AppContext.BaseDirectory,"test-data","atomic-retention-"+Guid.NewGuid().ToString("N"));
-  using(var link=new FishingControlLink(data))
+  TestTransport.Start(data,FishingIdentity.LiveEntries);using(var link=new FishingControlLink(data))
   {
    link.Configure(new FishingSettings{AutoSell=false,Retention=new FishingRetentionOptions{KeepLocked=true}});link.Start(12);
    var before=FishingJson.Read<FishingControl>(Path.Combine(data,"control.json"))!;

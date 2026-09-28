@@ -58,7 +58,8 @@ namespace BD2Fishing.Runtime
                 var file=Path.Combine(LocalStorage.DataRoot,"control.json");
                 try
                 {
-                    using(var f=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+                    var bytes=BD2.LocalIpc.RuntimeFiles.Read(file);
+                    using(var f=new MemoryStream(bytes??new byte[0]))
                     {if(f.Length>16000)throw new IOException("控制文件过大");control=(FishingControl)new DataContractJsonSerializer(typeof(FishingControl)).ReadObject(f);}
                 }
                 catch(IOException){}catch(UnauthorizedAccessException){}catch(System.Runtime.Serialization.SerializationException){}
@@ -216,6 +217,8 @@ namespace BD2Fishing.Runtime
         }
         private void LogDiagnostic(string message){if(diagnostics.Count<256)diagnostics.Enqueue(message);}
         private void ReleaseHold(){if(ownedHold!=null)ownedHold.OnPointerUp(null);ownedHold=null;}
-        internal void Stop(){navigation?.Stop();stopped=true;current=null;timer?.Dispose();timer=null;patch.UnpatchAll("bd2.fishing.inputs");network.Dispose();}
+        internal void PrepareHandoff(){control=new FishingControl();ReleaseHold();navigation?.Stop();}
+        internal string HandoffBusy(){var s=new FishingSnapshot();network.Fill(s);return ioBusy!=0?"snapshot writer":s.NetworkPending?"pending fishing response":latest.Busy||latest.MapTravelBusy?"map transition":"";}
+        internal void Stop(){ReleaseHold();navigation?.Stop();stopped=true;current=null;timer?.Dispose();timer=null;patch.UnpatchAll("bd2.fishing.inputs");network.Dispose();}
     }
 }
