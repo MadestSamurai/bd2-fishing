@@ -62,7 +62,7 @@
       "bd2fishing.core": {
         "type": "Project",
         "dependencies": {
-          "BD2Fishing.Compatibility": "[0.2.0, )"
+          "BD2Fishing.Compatibility": "[0.4.3, )"
         }
       }
     },
