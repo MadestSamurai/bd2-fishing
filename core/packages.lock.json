@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net8.0-windows7.0": {
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.30, )",
+        "resolved": "8.0.30",
+        "contentHash": "SfmwuZjUPBTEoBMAsXZ/hWkaEK9oL+Y/UtAx7N6RyWHfcMt9J0ExrNPuOgTyPbCXIyiTBFsxFNrPLEZNPmJcvA=="
+      },
       "Microsoft.CodeAnalysis.Analyzers": {
         "type": "Transitive",
         "resolved": "3.11.0",
@@ -53,6 +59,7 @@
           "Mono.Cecil": "[0.11.6, )"
         }
       }
-    }
+    },
+    "net8.0-windows7.0/win-x64": {}
   }
 }

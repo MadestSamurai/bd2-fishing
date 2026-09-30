@@ -20,6 +20,12 @@
           "System.Reflection.Metadata": "9.0.0"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.30, )",
+        "resolved": "8.0.30",
+        "contentHash": "SfmwuZjUPBTEoBMAsXZ/hWkaEK9oL+Y/UtAx7N6RyWHfcMt9J0ExrNPuOgTyPbCXIyiTBFsxFNrPLEZNPmJcvA=="
+      },
       "Mono.Cecil": {
         "type": "Direct",
         "requested": "[0.11.6, )",
@@ -54,6 +60,7 @@
           "System.Collections.Immutable": "9.0.0"
         }
       }
-    }
+    },
+    "net8.0-windows7.0/win-x64": {}
   }
 }
