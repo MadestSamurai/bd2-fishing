@@ -4,7 +4,7 @@ namespace BD2Fishing
     public static partial class FishingIdentity
     {
         public const string LiveEntries="runtime.json|control.json|latest.json";
-        public const string RuntimeName = "BD2Fishing.Runtime10";
+        public const string RuntimeName = "BD2Fishing.Runtime11";
         public static string DataRoot => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BD2Fishing");
         public static bool IsGameProcessName(string name) => string.Equals(name,"BrownDust II",StringComparison.OrdinalIgnoreCase) || string.Equals(name,"BrownDust II.exe",StringComparison.OrdinalIgnoreCase);
     }
@@ -50,6 +50,7 @@ namespace BD2Fishing
         public int ProtectedFishCount {get;set;}
         public bool SaleReady {get;set;}
         public bool SalePending {get;set;}
+        public bool SaleActive {get;set;}
         public int SoldCount {get;set;}
         public string SaleStatus {get;set;} = "尚未自动出售";
         public long SaleReplySerial {get;set;}

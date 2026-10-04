@@ -13,6 +13,6 @@ namespace BD2Fishing {
     return Attempts>=MaxAttempts?ApproachDecision.Fail:ApproachDecision.Retry;
    return ApproachDecision.Continue;
   }
-  public static bool CanRun(FishingSnapshot s,FishingControl c,long now)=>c!=null&&c.Valid(now,s.ProcessId)&&c.AutoApproach&&s.Ready&&s.MapGroupId>0&&s.State=="None"&&!s.CanCast&&!s.Busy&&!s.MapTravelBusy&&!s.MapChangePending&&s.BlockReason.Length==0&&s.Error.Length==0&&!s.ResultPopup&&!s.LevelPopup&&!s.NetworkPending&&!s.SalePending&&!s.BaitPending;
+  public static bool CanRun(FishingSnapshot s,FishingControl c,long now)=>c!=null&&c.Valid(now,s.ProcessId)&&c.AutoApproach&&s.Ready&&s.MapGroupId>0&&s.State=="None"&&!s.CanCast&&!s.Busy&&!s.MapTravelBusy&&!s.MapChangePending&&s.BlockReason.Length==0&&s.Error.Length==0&&!s.ResultPopup&&!s.LevelPopup&&!s.NetworkPending&&!s.SalePending&&!s.SaleActive&&!s.BaitPending;
  }
 }

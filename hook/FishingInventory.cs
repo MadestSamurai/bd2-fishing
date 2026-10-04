@@ -18,7 +18,7 @@ namespace BD2Fishing.Runtime
         private readonly Action<string> log;
         private FishingSalePlan plan;
         private long lastRead,replyAtSend;
-        private int groupId;
+        private int groupId,cycleStartSold;
         private string problem="等待读取鱼背包",lastProgress="";
         internal FishingInventory(Action<string> log){this.log=log;}
         internal static MethodInfo SaleMethod()=>(MethodInfo)FishingBindings.Api("Inventory.Sell");
@@ -51,10 +51,10 @@ namespace BD2Fishing.Runtime
         internal void Fill(FishingSnapshot s,long now,FishingControl control)
         {
             var options=control.Retention??new FishingRetentionOptions();
-            if(batch!=null && (!authorization.Valid(control,now,s.ProcessId) || !s.Ready || s.Busy || s.MapChangePending))
+            if(authorization!=null && (!authorization.Valid(control,now,s.ProcessId) || !s.Ready || s.Busy || s.MapChangePending || s.MapTravelBusy))
             {
                 batch=null;operationStatus="已取消后续出售；已确认解锁 "+unlock.UnlockedCount+" 条，锁定状态不会自动还原";
-                cancelledOwner=authorization.OwnerId;
+                cancelledOwner=authorization.OwnerId;authorization=null;
             }
             if(unlock.Pending)
             {
@@ -71,20 +71,32 @@ namespace BD2Fishing.Runtime
                 if(reply)lastRead=0;
             }
             s.SalePending=progress.Pending || unlock.Pending;s.SoldCount=progress.SoldCount;s.UnlockedCount=unlock.UnlockedCount;
-            s.SaleStatus=unlock.Pending?unlock.Status:operationStatus.Length>0?operationStatus:progress.Status;
             if(unlock.Error.Length>0)s.Error=unlock.Error;
             if(progress.Error.Length>0)s.Error=progress.Error;
             if(control.Enabled && control.OwnerId==cancelledOwner)s.Error=operationStatus+"；请重新开始钓鱼";
+            if(s.Ready)
+            {
+                var bag=Bag();
+                s.BagCount=bag?.Count??0;
+                s.BagCapacity=(int)FishingBindings.Num(FishingBindings.Read("Player.Data",null),"FishingFishInvenSlot");
+                if(!s.SalePending && s.State=="None" && ((plan!=null && plan.Options.Fingerprint()!=options.Fingerprint()) || now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks))Refresh(now,options);
+                s.SaleReady=plan!=null && problem.Length==0;s.SellableCount=plan?.Sellable??0;s.ProtectedFishCount=plan?.Protected??0;s.FishSpecies=species;
+                // A full bag starts one cleanup cycle. Free space after a confirmed batch must
+                // not end it; finish only after a fresh whole-bag plan has no eligible fish.
+                if(authorization!=null && !s.SalePending && s.SaleReady && s.State=="None" && s.Error.Length==0)
+                {
+                    operationStatus="本轮已确认出售 "+(progress.SoldCount-cycleStartSold)+" 条，剩余可售 "+s.SellableCount+" 条";
+                    if(s.SellableCount==0){authorization=null;batch=null;operationStatus="本轮已确认出售 "+(progress.SoldCount-cycleStartSold)+" 条，整理完成";}
+                }
+            }
+            s.SaleActive=authorization!=null;
+            s.SaleStatus=unlock.Pending?unlock.Status:progress.Pending?progress.Status:operationStatus.Length>0?operationStatus:progress.Status;
+            if(s.SaleActive && s.SalePending)s.SaleStatus="本轮已确认出售 "+(progress.SoldCount-cycleStartSold)+" 条，剩余可售 "+s.SellableCount+" 条"+" | "+s.SaleStatus;
+            if(problem.Length>0)s.SaleStatus=problem;
             if(s.Error.Length>0)s.SaleStatus=s.Error;
             if(s.SaleStatus!=lastProgress){lastProgress=s.SaleStatus;log("sale_status "+lastProgress);}
-            if(!s.Ready)return;
-            var bag=Bag();
-            s.BagCount=bag?.Count??0;
-            s.BagCapacity=(int)FishingBindings.Num(FishingBindings.Read("Player.Data",null),"FishingFishInvenSlot");
-            if(!s.SalePending && s.State=="None" && ((plan!=null && plan.Options.Fingerprint()!=options.Fingerprint()) || now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks))Refresh(now,options);
-            s.SaleReady=plan!=null && problem.Length==0;s.SellableCount=plan?.Sellable??0;s.ProtectedFishCount=plan?.Protected??0;s.FishSpecies=species;
-            if(problem.Length>0)s.SaleStatus=problem;
         }
+
         internal static System.Collections.IList RequestItems(FishingSalePlan freshPlan)
         {
             if(freshPlan==null || freshPlan.Items.Length==0 || freshPlan.Items.Any(f=>!FishingSalePlan.CanSell(f,freshPlan.Options)))throw new InvalidOperationException("出售清单未通过保护检查");
@@ -96,13 +108,17 @@ namespace BD2Fishing.Runtime
         internal bool Sell(long now,FishingSnapshot snapshot,FishingControl control)
         {
             if(unlock.Pending || progress.Pending || unlock.Error.Length>0 || progress.Error.Length>0)return false;
+            if(control==null || !control.Valid(now,snapshot.ProcessId) || !control.AutoSell || !snapshot.Ready || snapshot.State!="None" || snapshot.Busy || snapshot.MapTravelBusy || snapshot.MapChangePending || snapshot.BlockReason.Length>0 || snapshot.ResultPopup || snapshot.LevelPopup || snapshot.NetworkPending || snapshot.BaitPending || snapshot.Error.Length>0)return false;
+            if(authorization==null && !snapshot.BagFull)return false;
             var options=control.Retention??new FishingRetentionOptions();
             Refresh(now,options);
             if(plan==null || problem.Length>0 || plan.Items.Length==0){batch=null;return false;}
             if(control.OwnerId==cancelledOwner)return false;
-            if(batch==null){batch=plan;authorization=new FishingSaleAuthorization(control);}
-            if(!authorization.Valid(control,now,snapshot.ProcessId)){batch=null;cancelledOwner=authorization.OwnerId;return false;}
-            // Replan over the WHOLE bag, then limit to this transaction's original authorization.
+            if(authorization==null){authorization=new FishingSaleAuthorization(control);cycleStartSold=progress.SoldCount;operationStatus="";}
+            if(batch==null)batch=plan;
+            if(!authorization.Valid(control,now,snapshot.ProcessId)){batch=null;cancelledOwner=authorization.OwnerId;authorization=null;return false;}
+            // Replan over the WHOLE bag, then limit to this batch's original authorization.
+            // The cycle authorization survives successful batches but never a control change.
             var fresh=plan.RestrictTo(batch.Items.Select(f=>f.InvenIndex));
             if(fresh.Items.Length==0){batch=null;operationStatus="当前批次已无可售鱼，等待重新评估";return false;}
             if(fresh.RequiresUnlock.Length>0)

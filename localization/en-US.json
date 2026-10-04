@@ -290,5 +290,10 @@
   "日常执行器未激活，不能单独启动日常钓鱼组件。": "The daily executor is inactive. Start fishing through the daily workflow.",
   "连接仍在进行，已等待 ": "Connection is still in progress; waiting for ",
   " 秒；可打开诊断目录查看 connection.log。": " seconds. Open Diagnostics to view connection.log.",
-  "BD2 钓鱼 · 0.4.3": "BD2 Fishing · 0.4.3"
+  "BD2 钓鱼 · 0.4.3": "BD2 Fishing · 0.4.3",
+  "继续整理鱼背包，按保留规则分批出售": "Continuing fish-bag cleanup in protected batches",
+  "本轮已确认出售 ": "Confirmed sold this cleanup: ",
+  " 条，剩余可售 ": " fish; remaining eligible: ",
+  " 条，整理完成": " fish; cleanup complete",
+  "BD2 钓鱼 · 0.4.4": "BD2 Fishing · 0.4.4"
 }

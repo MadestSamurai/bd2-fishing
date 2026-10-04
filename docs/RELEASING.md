@@ -21,14 +21,14 @@
 
 ```powershell
 # 不注入、不连接服务器，只检查元数据并编译内存组件。
-BD2Fishing-0.4.3-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
+BD2Fishing-0.4.4-Portable-win-x64.exe --check-client "C:\YourGame\BrownDust II_Data\Managed" "compatibility-result.json"
 ```
 
 维护者的详细检查：
 
 ```powershell
 dotnet run --project compatibility-cli -c Release -- check "C:\YourGame\BrownDust II_Data\Managed" .build/client-check
-dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime10.dll
+dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Managed" .build/client-check/BD2Fishing.Runtime11.dll
 ```
 
 - [ ] 验证原生 UI 按下／松开、提竿、收线、长按入口。
@@ -39,6 +39,7 @@ dotnet run --project abi-probe -c Release -- "C:\YourGame\BrownDust II_Data\Mana
 - [ ] 验证六类原始回执仍唯一；不替换回调、不自行构造重发请求。
 - [ ] 验证稀有度、独立保留规则、鱼种MAX／MIN、出售 DTO 和背包回读；发送前重新核对锁定状态。解锁须核对原始回执的完整64位鱼实例ID，并等待库存解锁后重新规划。
 - [ ] 验证缺失／禁用／离开导航网格时的原生角色行走、到位转向与抛竿；停止或切图应释放工具所拥有的移动。
+- [ ] 验证 400 格背包按 100 条分批清空可售鱼；每批重新核对 MAX／MIN，整理完成才恢复钓鱼，停止／改设置／失败不得继续后续批次。
 - [ ] 验证鱼饵表、具体库存、使用数量、增益和回执。
 - [ ] 验证停止、租约失效、关闭窗口与模块冲突处理。
 

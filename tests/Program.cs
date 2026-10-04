@@ -67,7 +67,7 @@ var legendaryControl=C();legendaryControl.AutoSell=true;legendaryControl.Retenti
 Check(legendaryPolicy.Next(legendarySnapshot,legendaryControl,time)==FishingAction.SellFish,"legendary-only full bag can sell after opt-out");
 var legendaryProgress=new FishingSaleProgress();legendaryProgress.Begin(legendaryPlan,time);legendaryProgress.Observe(true,true,legendaryPlan.KeepIds,time);
 legendarySnapshot.BagFull=false;legendarySnapshot.SalePending=legendaryProgress.Pending;
-Check(legendaryProgress.SoldCount==100 && legendaryPolicy.Next(legendarySnapshot,legendaryControl,time+TimeSpan.FromSeconds(2).Ticks)==FishingAction.CastPress,"confirmed legendary sale frees space and resumes casting");
+Check(legendaryProgress.SoldCount==100 && legendaryPolicy.Next(legendarySnapshot,legendaryControl,time+TimeSpan.FromSeconds(2).Ticks)==FishingAction.CastPress,"without an active cleanup cycle, free space permits casting");
 var large=FishingSalePlan.Build(Enumerable.Range(1,230).Select(i=>Fish(i)));
 Check(large.Items.Length==100 && large.KeepIds.Length==130 && large.Sellable==230,"bounded batch retains all unsubmitted IDs");
 bool throws=false;try{FishingSalePlan.Build(new[]{Fish(1),Fish(1,4)});}catch(InvalidOperationException){throws=true;}Check(throws,"duplicate ID cannot sell protected alias");
@@ -89,7 +89,7 @@ var changed=FishingSalePlan.Build(new[]{Fish(100)});changed.Items[0].IsLocked=tr
 var auto=C();auto.AutoSell=true;p=new();s=S();s.BagFull=true;s.SaleReady=true;s.SellableCount=20;
 Check(p.Next(s,auto,time)==FishingAction.SellFish,"full idle bag invokes sale");
 s.SalePending=true;Check(p.Next(s,auto,time+1000000)==FishingAction.None,"sale pending prevents next cast or sale");
-s.SalePending=false;s.BagFull=false;Check(p.Next(s,auto,time+TimeSpan.FromSeconds(2).Ticks)==FishingAction.CastPress,"verified free space resumes fishing");
+s.SalePending=false;s.BagFull=false;Check(p.Next(s,auto,time+TimeSpan.FromSeconds(2).Ticks)==FishingAction.CastPress,"free space with no active cleanup permits fishing");
 foreach(var mode in new[]{"Fighting","Casting","Caught","Pause","BiteDetected","WaitingForBite","Auto"})
 {p=new();s=S(mode);s.BagFull=true;s.SaleReady=true;s.SellableCount=50;Check(p.Next(s,auto,time)!=FishingAction.SellFish,"no sale during "+mode);}
 foreach(var gate in new[]{"disabled","modal","reward","level","network","protected","unknown","scene"})
@@ -269,6 +269,7 @@ walking.Reset();walking.Begin(time,10);Check(walking.Observe(time+TimeSpan.FromS
 Check(walking.Observe(time+TimeSpan.FromSeconds(91).Ticks,3,false)==ApproachDecision.Retry,"long route still has a deadline");
 walking.Reset();walking.Begin(time,0);Check(walking.Observe(time+TimeSpan.FromMilliseconds(500).Ticks,0,true)==ApproachDecision.Continue&&walking.Observe(time+TimeSpan.FromSeconds(1).Ticks,0,true)==ApproachDecision.Retry,"arrival waits for actual native casting permission");
 NavigationRegression.Run(Check);
+InventoryRegression.Run(Check);
 assertions+=RetentionTests.Run();
 assertions+=UnlockTests.Run();
 assertions+=LocalizationTests.Run();

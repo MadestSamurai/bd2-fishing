@@ -181,7 +181,7 @@ namespace BD2Fishing.Runtime
                     var mapControl=control;
                     if(mapControl==null || !mapControl.Valid(DateTime.UtcNow.Ticks,pid) || !mapControl.AutoMapRenewal)
                         throw new InvalidOperationException("往返换图已取消，请重新开启钓鱼");
-                    if(s.MapTravelBusy || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)
+                    if(s.SaleActive || s.MapTravelBusy || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)
                         throw new InvalidOperationException("换图状态发生变化，请检查游戏后重新开启");
                     if(action==FishingAction.TravelLobby && (!s.Ready || s.State!="None") || action==FishingAction.TravelReturn && !s.LobbyReady)
                         throw new InvalidOperationException("换图入口未就绪，已暂停");
@@ -190,12 +190,12 @@ namespace BD2Fishing.Runtime
                     navigation.Stop();FishingMap.Travel(mapManager,targetMap);break;
                 case FishingAction.SellFish:
                     var c=control;
-                    if(c==null || !c.Valid(DateTime.UtcNow.Ticks,pid) || !c.AutoSell || !s.Ready || s.State!="None" || !s.BagFull || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
+                    if(c==null || !c.Valid(DateTime.UtcNow.Ticks,pid) || !c.AutoSell || !s.Ready || s.State!="None" || (!s.BagFull && !s.SaleActive) || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
                     if(!inventory.Sell(DateTime.UtcNow.Ticks,s,c))return;
                     break;
                 case FishingAction.UseBait:
                     var baitControl=control;
-                    if(baitControl==null || !baitControl.Valid(DateTime.UtcNow.Ticks,pid) || !baitControl.AutoBait || !s.Ready || s.State!="None" || s.BagFull || !s.CanCast || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
+                    if(baitControl==null || !baitControl.Valid(DateTime.UtcNow.Ticks,pid) || !baitControl.AutoBait || !s.Ready || s.State!="None" || s.BagFull || s.SaleActive || !s.CanCast || s.Busy || s.MapChangePending || s.BlockReason.Length>0 || s.ResultPopup || s.LevelPopup || s.NetworkPending || s.SalePending || s.BaitPending)return;
                     if(!bait.Use(ui,DateTime.UtcNow.Ticks,s.BaitReplySerial))return;
                     break;
                 case FishingAction.ApproachWater:

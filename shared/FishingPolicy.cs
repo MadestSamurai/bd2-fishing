@@ -71,12 +71,12 @@ namespace BD2Fishing
             {
                 case "None":
                     if(s.MapChangePending){Reason="本竿已结束，等待昼夜切换";break;}
-                    if(s.BagFull)
+                    if(s.BagFull || s.SaleActive)
                     {
                         if(!c.AutoSell){Reason="鱼背包已满，自动出售未开启";break;}
                         if(!s.SaleReady){Reason=s.SaleStatus;break;}
                         if(s.SellableCount<=0){Reason="背包已满，没有符合当前设置的可售鱼；请调整保留选项、手动整理或扩容";break;}
-                        Reason="背包已满，按保留规则整理并出售鱼";
+                        Reason=s.SaleActive?"继续整理鱼背包，按保留规则分批出售":"背包已满，按保留规则整理并出售鱼";
                         lastInput=now;return FishingAction.SellFish;
                     }
                     if(!s.CanCast){Reason=c.AutoApproach?"自动前往可钓区域":"请移动到可钓位置并面向水面";if(FishingApproach.CanRun(s,c,now)){lastInput=now;return FishingAction.ApproachWater;}break;}

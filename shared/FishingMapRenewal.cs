@@ -23,7 +23,7 @@ namespace BD2Fishing
             {Cancel();Status="自动往返换图已关闭";return Finish(s,false);}
             if(Fault.Length>0)return Fail(s,Fault);
             bool clear=!s.Busy && !s.MapTravelBusy && !s.MapChangePending && s.BlockReason.Length==0 &&
-                !s.NetworkPending && !s.SalePending && !s.BaitPending && !s.ResultPopup && !s.LevelPopup;
+                !s.NetworkPending && !s.SalePending && !s.SaleActive && !s.BaitPending && !s.ResultPopup && !s.LevelPopup;
             if(stage!=0)
             {
                 if(now-sentAt>TimeSpan.FromSeconds(120).Ticks)

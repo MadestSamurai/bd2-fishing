@@ -12,7 +12,7 @@ A standalone fishing assistant for the BrownDust II Windows client. Uses the gam
 
 ## Download
 
-Current version: **0.4.3**. Both editions have the same features and include Simplified Chinese / English.
+Current version: **0.4.4**. Both editions have the same features and include Simplified Chinese / English.
 
 | Edition | Runtime requirement | Recommended for |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 
 ## Quick start
 
-**Before upgrading:** pause and close the old assistant, then connect with the new version. Upgrading from 0.4.1 or earlier requires one normal game restart. When upgrading from 0.4.2 or the 0.4.3 test build, the game can stay open.
+**Before upgrading:** pause and close the old assistant, then connect with the new version. Upgrading from 0.4.1 or earlier requires one normal game restart. When upgrading from 0.4.2 or later, the game can stay open.
 
 1. Enter an unlocked fishing map and turn off the game’s built-in automatic fishing.
 2. Open the assistant, click **Connect game**, and wait for the fishing area to be recognized.
@@ -37,7 +37,7 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 | Next cast delay | Default 1000 ms; accepts 0–60000 ms. Reeling and holds use game frames independently. |
 | Cast charge | Default 90%; accepts 5–95%. |
 | Prefer weak points | Uses a normal hit if the weak point cannot be reached in time. |
-| Sell when full | On by default; sells only fish allowed by the rules below. |
+| Sell when full | On by default; clears all eligible fish in verified batches of up to 100, then resumes fishing. |
 | Keep all Legendary / locked / unknown fish | Three independent protections, on by default. |
 | Size records by species | Keep no extra fish, MAX only, MIN only, or MAX and MIN. Applies separately to Legendary and locked fish. |
 | Automatic bait | On by default; uses one existing bait when the buff expires. Continues without bait when depleted. |

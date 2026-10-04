@@ -48,15 +48,15 @@ public class PlayerMoveController:UnityEngine.Component {
 namespace BD2Fishing.Runtime {
  using UnityEngine;
  internal class NavigationHost {public PlayerController Player=new();public Component Boat=new();public gamfs.Fishing.FishingCastingArea[] Areas=Array.Empty<gamfs.Fishing.FishingCastingArea>();}
- internal static class FishingBindings {
+ internal static partial class FishingBindings {
   public static NavigationHost Host=new();
-  public static object Read(string role,object? owner)=>Host;
+  public static object Read(string role,object? owner)=>role=="Player.Data"?Inventory:Host;
   public static object? Get(object? obj,string name)=>obj switch {
    NavigationHost h=>name switch {"ὬὪὧὦὭὬὪὧὣὣὫ"=>h.Player,"ὫὨὥὣὫὪὨὥὪὡὣ"=>h.Areas,"ὪὪὯὪὪὡὠὬὣὭὥ"=>h.Boat,_=>throw new Exception(name)},
    PlayerController p=>p.Move,
    PlayerMoveController m=>name switch {"ὦὣὠὨὣὨὡὯὪὢὦ"=>m.Nav,"ὫὬὤὪὠὧὨὩὬὬὩ"=>m.Body,"ὭὠὢὩὫὤὥὬὧὡὢ"=>m.State,"ὠὤὣὫὮὢὬὨὫὢὡ"=>m.Mode,_=>throw new Exception(name)},
    gamfs.Fishing.FishingCastingArea a=>name=="diameter"?a.diameter:a.height,
-   _=>null};
+   _=>obj?.GetType().GetProperty(name)?.GetValue(obj)};
   public static object? Call(object obj,string name,params object?[] args){var m=(PlayerMoveController)obj;if(name=="ChangeMoveType"){m.ChangeMoveType((string)args[0]!);return null;}return m.SetMoveNav((Vector3)args[0]!,args[1],(bool)args[2]!);}
   public static object EnumObject(string role,string name)=>name;
   public static double Num(object obj,string name)=>Convert.ToDouble(Get(obj,name));
