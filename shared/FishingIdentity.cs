@@ -117,6 +117,9 @@ namespace BD2Fishing
         public bool HoldTargetHit {get;set;}
         public bool HoldInside {get;set;}
         public bool NetworkPending {get;set;}
+        public bool NetworkIdle {get;set;}
+        public long InventoryRefreshTicks {get;set;}
+        public int NetworkRecoveries {get;set;}
         public double NetworkWaitSeconds {get;set;}
         public string Network {get;set;} = "尚无钓鱼请求";
         public int Catches {get;set;}

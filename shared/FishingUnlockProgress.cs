@@ -21,7 +21,7 @@ namespace BD2Fishing
             if(!Pending)return;
             if(!responseArrived)
             {
-                if(now-sentAt>TimeSpan.FromSeconds(30).Ticks)Error=Status="解锁超过 30 秒，未重发；请核对游戏";
+                if(now-sentAt>TimeSpan.FromSeconds(30).Ticks)Status="等待同步鱼锁定状态，恢复后自动继续";
                 return;
             }
             Pending=false;
@@ -29,6 +29,13 @@ namespace BD2Fishing
             {Error=Status="解锁回执或背包锁定状态不一致，已暂停出售";return;}
             Completed=true;UnlockedCount++;
             Status="已确认解锁 "+UnlockedCount+" 条待售鱼";
+        }
+        public bool NeedsRefresh(long now)=>Pending&&now-sentAt>=TimeSpan.FromSeconds(30).Ticks;
+        public bool Reconcile(long snapshotTicks,bool nativeIdle)
+        {
+            if(!Pending||!nativeIdle||snapshotTicks<=sentAt)return false;
+            Pending=false;Completed=false;Error="";Status="已同步当前锁定状态，重新核对保留规则";
+            return true;
         }
         public void AcknowledgeError(){if(!Pending)Error="";}
     }

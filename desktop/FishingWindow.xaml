@@ -22,8 +22,8 @@
 <CheckBox x:Name="KeepUnknownBox" Content="保留资料不明的鱼" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged" Margin="0,0,0,8"/>
 <TextBlock Text="取消后仍需满足游戏出售条件；库存 ID、出售条目无效或无法判断其他保留规则时会跳过。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
 <Expander Header="按鱼种保留尺寸纪录" IsExpanded="True" Margin="0,0,0,16"><StackPanel Margin="0,10,0,0">
-<TextBlock Text="尺寸规则额外保留鱼，不覆盖上方的全部保留选项。要仅保留极值，请取消对应的全部保留。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
-<WrapPanel><CheckBox x:Name="SizeLegendaryBox" Content="应用于传说鱼" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged" Margin="0,0,20,8"/><CheckBox x:Name="SizeLockedBox" Content="应用于锁定鱼" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged" Margin="0,0,0,8"/></WrapPanel>
+<TextBlock Text="尺寸规则始终覆盖该鱼种的全部鱼，包括普通未锁鱼。下方选项额外保留分类纪录；上方全部保留仍然有效。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+<WrapPanel><CheckBox x:Name="SizeLegendaryBox" Content="额外保留传说鱼中的尺寸纪录" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged" Margin="0,0,20,8"/><CheckBox x:Name="SizeLockedBox" Content="额外保留锁定鱼中的尺寸纪录" IsChecked="True" Checked="SettingsChanged" Unchecked="SettingsChanged" Margin="0,0,0,8"/></WrapPanel>
 <WrapPanel><StackPanel Margin="0,0,12,8"><TextBlock Text="鱼种"/><ComboBox x:Name="SpeciesBox" Width="230" Margin="0,4,0,0" SelectionChanged="SpeciesChanged"/></StackPanel><StackPanel Margin="0,0,0,8"><TextBlock Text="额外保留"/><ComboBox x:Name="SizeModeBox" Width="160" Margin="0,4,0,0" SelectionChanged="SizeModeChanged"/></StackPanel></WrapPanel>
 <TextBlock x:Name="SpeciesHint" Text="连接后读取背包鱼种。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}"/>
 <TextBlock Text="按当前背包的同种鱼比较；并列保留一条，最大和最小相同时只保留一条。" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>

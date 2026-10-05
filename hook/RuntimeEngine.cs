@@ -85,7 +85,10 @@ namespace BD2Fishing.Runtime
                 if(holdPhase && (ui==null || !ReferenceEquals(FishingBindings.Get(FishingBindings.Get(ui,"_skillCaster"),"_holdItem"),hold)))return;
                 var s=Read(now);var c=control??new FishingControl();
                 if(c.Valid(now,pid) && observedOwner!=c.OwnerId){observedOwner=c.OwnerId;network.AcknowledgeError();inventory.AcknowledgeError();bait.AcknowledgeError();}
+                if(!holdPhase)network.Reconcile(now);
                 network.Fill(s);inventory.Fill(s,now,c);bait.Fill(ui,s,now);
+                if(!holdPhase&&c.Valid(now,pid)&&s.Ready&&s.State=="None"&&s.BlockReason.Length==0&&!s.Busy&&!s.MapTravelBusy
+                    &&(inventory.NeedsRefresh(now)||bait.NeedsRefresh(now))){network.RefreshInventory(now);network.Reconcile(now);network.Fill(s);}
                 if(!holdPhase)navigation.Reconcile(s,c,now,policy.Fault.Length>0);
                 var action=policy.Next(s,c,now,holdPhase);
                 if(action!=FishingAction.None)Apply(action,s);

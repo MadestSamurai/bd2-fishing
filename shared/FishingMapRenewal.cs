@@ -10,7 +10,7 @@ namespace BD2Fishing
         public int OriginalMap {get;private set;} = -1;
         public string Fault {get;private set;} = "";
         public string Status {get;private set;} = "";
-        public void Cancel(){stage=0;lobbySince=0;OriginalMap=-1;Fault="";}
+        public void PauseClock(long elapsed){if(stage!=0){sentAt+=elapsed;if(lobbySince>0)lobbySince+=elapsed;}} public void Cancel(){stage=0;lobbySince=0;OriginalMap=-1;Fault="";}
         public static double LeadSeconds(double duration) => Math.Min(300, duration / 6);
         private bool Finish(FishingSnapshot s,bool block)
         {s.MapRenewalStatus=Status;s.MapRenewals=completed;return block;}

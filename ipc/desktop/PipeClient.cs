@@ -8,16 +8,25 @@ namespace BD2.LocalIpc
 {
     public sealed class PipeClient
     {
-        readonly int pid; readonly long start; readonly string channel;
+        readonly int pid; readonly long start; readonly string channel, dataRoot;
         readonly object sync = new object();
         string generation = "", ticket = "";
         public bool HasLease { get { lock(sync) return ticket.Length > 0; } }
-        public PipeClient(string root, int pid, long start) { channel = Wire.Channel(root); this.pid = pid; this.start = start; }
+        public PipeClient(string root, int pid, long start) { dataRoot=root; channel = Wire.Channel(root); this.pid = pid; this.start = start; }
         sealed class Response { internal string Status, Generation, Ticket; internal byte[] Value; }
         Response Call(string verb, string name, byte[] value)
         {
             lock (sync)
             {
+                try
+                {
+                    using (var process = System.Diagnostics.Process.GetProcessById(pid))
+                        if (process.HasExited || process.StartTime.ToUniversalTime().Ticks != start)
+                            throw new IOException("Game session ended; return to the host to connect again.");
+                }
+                catch (ArgumentException error) { throw new IOException("Game process is no longer running.", error); }
+                catch (System.ComponentModel.Win32Exception error) { throw new IOException("Game session cannot be accessed.", error); }
+
                 using (var pipe = new NamedPipeClientStream(".", Wire.Endpoint(pid, start), PipeDirection.InOut, PipeOptions.Asynchronous))
                 {
                     pipe.Connect(Wire.TimeoutMilliseconds); Wire.VerifyServer(pipe, pid, start);
@@ -42,7 +51,7 @@ namespace BD2.LocalIpc
         }
         public string[] List(string prefix){var reply=Call("list",prefix,new byte[0]);if(reply.Status!="ok")return new string[0];using(var r=new BinaryReader(new MemoryStream(reply.Value))){int n=r.ReadInt32();if(n<0||n>10000)throw new IOException("Invalid IPC listing");var result=new string[n];for(int i=0;i<n;i++)result[i]=r.ReadString();Wire.End(r);return result;}}
         public byte[] Read(string name) { var r = Call("read", name, new byte[0]); return r.Status == "ok" ? r.Value : null; }
-        public void Write(string name, byte[] value, bool createOnly = false) { if (Call(createOnly ? "create" : "write", name, value).Status != "ok") throw new IOException("Component is not ready"); }
+        public void Write(string name, byte[] value, bool createOnly = false) { var guard=AppDomain.CurrentDomain.GetData("BD2Daily.HostedWriteGuard") as Action<string,string,byte[]>; if(guard!=null)guard(dataRoot,name,value); if (Call(createOnly ? "create" : "write", name, value).Status != "ok") throw new IOException("Component is not ready"); }
         public bool DeleteIf(string name,byte[] expected){return Call("delete-if",name,expected).Status=="ok";}
         public void Delete(string name) { if (Call("delete", name, new byte[0]).Status != "ok") throw new IOException("Component is not ready"); }
     }

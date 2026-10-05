@@ -63,7 +63,7 @@ public static class HookCompiler
     {
         var helper=r.Types[r.Contract.Roles["Inventory"]];
         var methods=MetadataIndex.Walk(new[]{helper}).SelectMany(t=>t.Methods).Where(m=>m.ReturnType.FullName=="System.Boolean" && m.Parameters.Select(p=>p.ParameterType.FullName).SequenceEqual(new[]{"System.Byte[]","System.Int32","System.Int32"}) && m.HasBody).ToArray();
-        foreach(var kind in new[]{"Casting","BiteStart","BiteFishStaminaUpdate","BiteEnd","ShopSell","BaitUse"})
+        foreach(var kind in new[]{"Casting","BiteStart","BiteFishStaminaUpdate","BiteEnd","ShopSell","BaitUse","ItemInfo"})
         {
             string response="Proto.Net.Fishing"+kind+"Response";
             int count=methods.Count(m=>m.Body.Instructions.Any(i=>i.Operand is MethodReference call && call.DeclaringType.FullName==response && call.Name=="get_Parser"));
@@ -99,7 +99,7 @@ public static class HookCompiler
             return "{"+Q(api.Role)+",new[]{"+Q(m.DeclaringType.FullName.Replace('/','+'))+","+Q(method?m.MetadataToken.ToInt32().ToString():m.Name)+","+Q(method?"method":"member")+"}}";
         });
         string Dictionary(Dictionary<string,string> d)=>"new System.Collections.Generic.Dictionary<string,string>{"+string.Join(",",d.Select(x=>"{"+Q(x.Key)+","+Q(x.Value)+"}"))+"}";
-        return "namespace BD2Fishing.Runtime { internal static class FishingClient { internal const string CompiledMvid="+Q(r.Report.ClientMvid)+"; internal static readonly System.Collections.Generic.Dictionary<string,string> TypeNames="+Dictionary(types)+"; internal static readonly System.Collections.Generic.Dictionary<string,string> MemberNames="+Dictionary(names)+"; internal static readonly System.Collections.Generic.Dictionary<string,string[]> Apis=new System.Collections.Generic.Dictionary<string,string[]>{"+string.Join(",",apiEntries)+"}; }}";
+        return "namespace BD2Fishing.Runtime { internal static class FishingClient { internal const string CompiledMvid="+Q(r.Report.ClientMvid)+"; internal static readonly System.Collections.Generic.Dictionary<string,string> TypeNames="+Dictionary(types)+"; internal static readonly System.Collections.Generic.Dictionary<string,string> MemberNames="+Dictionary(names)+"; internal static readonly System.Collections.Generic.Dictionary<string,string[]> Apis=new System.Collections.Generic.Dictionary<string,string[]>{"+string.Join(",",apiEntries.Concat(RecoveryBindings.Resolve(r).Select(x=>"{"+Q(x.Key)+",new[]{"+Q(x.Value.DeclaringType.FullName.Replace('/' ,'+'))+","+Q(x.Value.MetadataToken.ToInt32().ToString())+","+Q("method")+"}}")))+"}; }}";
     }
 }
 public sealed class CompatibilityException : Exception

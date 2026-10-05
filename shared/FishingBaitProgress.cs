@@ -27,7 +27,14 @@ namespace BD2Fishing
                 if(remaining!=before-1 || !active){Error=Status="鱼饵回执与库存／增益不一致，已暂停；请检查游戏";return;}
                 UsedCount++;Status="已确认使用鱼饵，库存扣减与增益一致";return;
             }
-            if(now-sent>TimeSpan.FromSeconds(30).Ticks)Error=Status="鱼饵使用超过 30 秒未确认，已暂停；不会自动重试";
+            if(now-sent>TimeSpan.FromSeconds(30).Ticks)Status="等待同步鱼饵状态，恢复后自动继续";
+        }
+        public bool NeedsRefresh(long now)=>Pending&&now-sent>=TimeSpan.FromSeconds(30).Ticks;
+        public bool Reconcile(long snapshotTicks,bool nativeIdle)
+        {
+            if(!Pending||!nativeIdle||snapshotTicks<=sent)return false;
+            Pending=false;Error="";Status="鱼饵结果待核对，本次运行不再自动使用鱼饵";
+            return true;
         }
         public void AcknowledgeError(){if(!Pending)Error="";}
     }

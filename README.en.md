@@ -12,7 +12,7 @@ A standalone fishing assistant for the BrownDust II Windows client. Uses the gam
 
 ## Download
 
-Current version: **0.4.4**. Both editions have the same features and include Simplified Chinese / English.
+Current version: **0.4.5**. Both editions have the same features and include Simplified Chinese / English.
 
 | Edition | Runtime requirement | Recommended for |
 | --- | --- | --- |
@@ -39,14 +39,14 @@ Download one edition: the EXE runs on its own; ZIPs include both READMEs and lic
 | Prefer weak points | Uses a normal hit if the weak point cannot be reached in time. |
 | Sell when full | On by default; clears all eligible fish in verified batches of up to 100, then resumes fishing. |
 | Keep all Legendary / locked / unknown fish | Three independent protections, on by default. |
-| Size records by species | Keep no extra fish, MAX only, MIN only, or MAX and MIN. Applies separately to Legendary and locked fish. |
+| Size records by species | Keep no extra fish, MAX only, MIN only, or MAX and MIN across the whole species. Optional category settings additionally protect Legendary and locked records. |
 | Automatic bait | On by default; uses one existing bait when the buff expires. Continues without bait when depleted. |
 | Automatic approach | On by default; uses native navigation or character movement to reach a casting area. |
 | Map renewal | On by default; with 5 minutes left, finishes the catch, visits the lobby, then returns to the same map. |
 
 ### MAX / MIN retention
 
-Protections are combined. **Keep all Legendary fish** still protects every Legendary fish even when MAX is selected. To retain only records, turn off the matching **Keep all** option, choose a species, and select MAX, MIN or both. Sizes are compared within each species and selected category. Ties retain one fish, preferring a locked fish and then the lowest inventory ID; identical MIN and MAX retain one fish. Missing size data protects the affected species.
+Protections are combined. **Keep all Legendary fish** still protects every Legendary fish even when MAX is selected. To retain only records, turn off the matching **Keep all** option, choose a species, and select MAX, MIN or both. Sizes are compared across every fish in a species. The two category options add Legendary or locked records; they never restrict the baseline size rule. Ties retain one fish, preferring a locked fish and then the lowest inventory ID; identical MIN and MAX retain one fish. Missing size data protects the affected species.
 
 Turning off **Keep all locked fish** allows the tool to unlock only fish selected for sale. It waits for the game's reply and checks inventory before replanning and selling. Still-locked fish are never sent in a sale request. Stopping, disabling sales or changing retention cancels subsequent actions; already unlocked fish are not automatically relocked. A failed or unconfirmed request pauses instead of being blindly resent.
 

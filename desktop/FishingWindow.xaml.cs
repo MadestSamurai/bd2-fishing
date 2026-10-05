@@ -10,6 +10,8 @@ using System.Windows.Threading;
 namespace BD2Fishing.Desktop;
 public partial class FishingWindow:Window
 {
+ public bool HostedAutomationEnabled => link.Enabled || starting || !controlQueue.IsCompleted || connecting;
+
  private WindowLanguage? language;
  private readonly string root;private readonly FishingControlLink link;private readonly DispatcherTimer timer;
  private FishingSnapshot? snapshot;private bool initialized,connecting,closing,smoke,refreshing,starting;
@@ -24,7 +26,7 @@ public partial class FishingWindow:Window
  private void ReportError(string stage,Exception ex){FishingDiagnostics.Write(root,stage,error:ex);if(!closing)ReasonText.Text=ex.GetBaseException().Message;}
  public FishingWindow(string? dataRoot=null)
  {
-  root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageBox);Title="BD2 钓鱼 · "+typeof(FishingWindow).Assembly.GetName().Version!.ToString(3);
+  root=dataRoot??FishingIdentity.DataRoot;link=new(root);InitializeComponent();BD2.Distribution.DistributionNotice.Attach(this,LanguageBox);Title="BD2 钓鱼 · "+App.DisplayVersion;
   var s=FishingJson.Read<FishingSettings>(Path.Combine(root,"settings.json"))??new();
   if(!FishingControl.ValidSettings(s.NextCastMilliseconds,s.CastGauge))s=new();
   IntervalBox.Text=s.NextCastMilliseconds.ToString();CastBox.Text=(s.CastGauge*100).ToString("0.#",CultureInfo.InvariantCulture);WeakBox.IsChecked=s.PreferWeak;AutoSellBox.IsChecked=s.AutoSell;LoadRetention(s.Retention);AutoApproachBox.IsChecked=s.AutoApproach;AutoBaitBox.IsChecked=s.AutoBait;AutoMapBox.IsChecked=s.AutoMapRenewal;
@@ -127,7 +129,7 @@ public partial class FishingWindow:Window
   GaugeBar.Value=Math.Clamp(s.Gauge*100,0,100);GaugeText.Text=$"{s.Gauge*100:0}% · 当前档位 {s.CastGrade}";
   NetworkText.Text="网络："+s.Network+(s.NetworkPending?$"（等待 {s.NetworkWaitSeconds:0.0} 秒）":"");
   ActionText.Text=$"阶段：{StateName(s.State)}　操作：{ActionName(s.LastAction)}　共 {s.ActionCount} 次";
-  StartButton.IsEnabled=!link.Enabled&&!connecting&&!starting&&s.Ready&&!s.NetworkPending&&s.State!="Auto";StopButton.IsEnabled=link.Enabled;
+  StartButton.IsEnabled=!link.Enabled&&!connecting&&!starting&&s.Ready&&s.State!="Auto";StopButton.IsEnabled=link.Enabled||starting||s.Enabled;
  }
  private static string StateName(string s)=>s switch{"None"=>"准备抛竿","Casting"=>"蓄力抛竿","WaitingForBite"=>"等待咬钩","BiteDetected"=>"提竿","Fighting"=>"收线","Pause"=>"波次间隔","Caught"=>"收获结算","Auto"=>"游戏内自动钓鱼",_=>"未就绪"};
  private static string ActionName(string s)=>s switch{"CastPress"=>"开始蓄力","CastRelease"=>"释放抛竿","Hook"=>"提竿","FightClick"=>"收线点击","HoldPress"=>"按住收线","HoldRelease"=>"松开收线","ClosePopup"=>"确认弹窗","SellFish"=>"按保留规则出售鱼","ApproachWater"=>"走向可钓区域","UseBait"=>"使用一份鱼饵","TravelLobby"=>"前往钓鱼大厅","TravelReturn"=>"返回原钓场",_=>"尚未操作"};

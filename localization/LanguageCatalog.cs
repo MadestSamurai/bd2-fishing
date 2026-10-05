@@ -12,9 +12,9 @@ public sealed class LanguageCatalog
     private static readonly Lazy<Regex> Fragments=new(()=>new Regex(string.Join("|",English.Value.Keys.OrderByDescending(k=>k.Length).Select(Regex.Escape)),RegexOptions.Compiled|RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100)));
     private readonly Dictionary<string,string> cache=new(StringComparer.Ordinal);
     public string Language {get; private set;}
-    public LanguageCatalog(string? language=null)=>Language=Normalize(language);
-    public static string Normalize(string? language)=>language is "zh-CN" or "en-US"?language:CultureInfo.CurrentUICulture.TwoLetterISOLanguageName=="zh"?"zh-CN":"en-US";
-    public void Select(string language){Language=Normalize(language);cache.Clear();}
+    public LanguageCatalog(string? language=null)=>Language=Normalize(language ?? AppDomain.CurrentDomain.GetData("BD2Daily.HostedLanguage") as string);
+    public static string Normalize(string? language)=>language is "zh-CN" or "en-US" || language=="zh-TW" && AppDomain.CurrentDomain.GetData("BD2Daily.TraditionalText") is Func<string,string>?language!:CultureInfo.CurrentUICulture.TwoLetterISOLanguageName=="zh"?"zh-CN":"en-US";
+    public void Select(string language){Language=Normalize(language ?? AppDomain.CurrentDomain.GetData("BD2Daily.HostedLanguage") as string);cache.Clear();}
     public static Dictionary<string,string> Read(string language)
     {
         using var stream=typeof(LanguageCatalog).Assembly.GetManifestResourceStream("Locale."+language+".json")??throw new InvalidOperationException("Missing language catalog: "+language);
@@ -22,6 +22,7 @@ public sealed class LanguageCatalog
     }
     public string Text(string source)
     {
+        if(Language=="zh-TW" && AppDomain.CurrentDomain.GetData("BD2Daily.TraditionalText") is Func<string,string> traditional)return traditional(source);
         if(Language=="zh-CN" || string.IsNullOrEmpty(source))return source;
         if(English.Value.TryGetValue(source,out var exact))return exact;
         if(cache.TryGetValue(source,out var translated))return translated;
@@ -37,14 +38,19 @@ public static class LanguagePreference
 {
     public static string Read(string root)
     {
+        // The shared desktop host owns only this window's UI locale, not standalone preferences.
+        if(AppDomain.CurrentDomain.GetData("BD2Daily.HostedLanguage") is string hosted && hosted is "zh-CN" or "zh-TW" or "en-US")return hosted;
         try{return LanguageCatalog.Normalize(JsonSerializer.Deserialize<Preference>(File.ReadAllText(Path.Combine(root,"language.json")))?.Language);}
         catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){return LanguageCatalog.Normalize(null);}
     }
     public static void Save(string root,string language)
     {
+        if(AppDomain.CurrentDomain.GetData("BD2Daily.HostedLanguage") is string hosted && hosted is "zh-CN" or "zh-TW" or "en-US")
+        {return;}
         Directory.CreateDirectory(root);var path=Path.Combine(root,"language.json");var temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
         try{File.WriteAllText(temporary,JsonSerializer.Serialize(new Preference{Language=LanguageCatalog.Normalize(language)}));File.Move(temporary,path,true);}
         finally{if(File.Exists(temporary))File.Delete(temporary);}
     }
     private sealed class Preference {public string? Language {get;set;}}
 }
+

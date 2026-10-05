@@ -16,7 +16,7 @@ namespace BD2.LocalIpc
         DateTime requested, idle;
         bool pending, stopped, starting;
         public bool Pending { get { return pending; } }
-        public bool IsActive { get { foreach(var old in Registry) if((string)old["module"]==module&&(bool)old["active"]&&!Paused(old))return true;return false; } }
+        public bool IsActive { get { lock(AppDomain.CurrentDomain){foreach(var old in Registry) if((string)old["module"]==module&&(bool)old["active"]&&!Paused(old))return true;return false;} } }
         static bool Paused(Dictionary<string,object> entry){return entry.ContainsKey("paused")&&(bool)entry["paused"];}
         public void Fail(Exception error){pending=false;ReleasePending();status("error",error.GetBaseException().Message);}
         public Handoff(string module, string family, string group, bool passive, Action start, Action pause, Func<string> busy, Action stop, Action<string, string> status)
@@ -35,7 +35,7 @@ namespace BD2.LocalIpc
         }
         // Standalone tools are exclusive. Only explicitly coordinated suites may coexist.
         public static bool HasActive(string group,string family){foreach(var entry in Registry)if((string)entry["group"]==group&&(string)entry["family"]==family&&(bool)entry["active"]&&!Paused(entry))return true;return false;}
-        static bool Cooperates(string a,string b){return a==b&&(a=="daily"||a=="workbench");}
+        static bool Hosted(string module){var owned=AppDomain.CurrentDomain.GetData("BD2.LocalIpc.SuiteModules.v1") as HashSet<string>;return owned!=null&&owned.Contains(module);} static bool Cooperates(string a,string b){return a==b&&(a=="daily"||a=="workbench");}
         public void Request(DateTime now)
         {
             if (pending) return;
@@ -59,7 +59,7 @@ namespace BD2.LocalIpc
                     AppDomain.CurrentDomain.SetData(Key + ".pending", module);
                     retiring = new List<Dictionary<string, object>>();
                     foreach (var old in Registry)
-                        if ((bool)old["active"] && ((string)old["family"] == family || (!passive && !(bool)old["passive"] && !Cooperates((string)old["group"],group)))) retiring.Add(old);
+                        if ((bool)old["active"] && ((string)old["family"] == family || (!passive && !(bool)old["passive"] && !Cooperates((string)old["group"],group)&&!(Hosted(module)&&Hosted((string)old["module"]))))) retiring.Add(old);
                     foreach (var old in retiring) { old["paused"]=true; ((Action)old["pause"])(); }
                 }
                 string reason = "";
@@ -83,8 +83,8 @@ namespace BD2.LocalIpc
                     stopped = true; return; // A separate frame permits Unity's deferred destruction to finish.
                 }
                 starting=true; start(); starting=false;
-                Registry.RemoveAll(x => !(bool)x["active"]);
-                Registry.Add(new Dictionary<string, object> { { "module", module }, { "family", family }, { "group", group }, { "passive", passive }, { "active", true }, { "pause", pause }, { "busy", busy }, { "stop", stop } });
+                lock(AppDomain.CurrentDomain){Registry.RemoveAll(x => !(bool)x["active"]);
+                Registry.Add(new Dictionary<string, object> { { "module", module }, { "family", family }, { "group", group }, { "passive", passive }, { "active", true }, { "pause", pause }, { "busy", busy }, { "stop", stop } });}
                 pending = false; ReleasePending(); status("active", "");
             }
             catch (Exception error)

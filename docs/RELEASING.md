@@ -62,3 +62,9 @@ This operation reuses the original build; do not move a published tag or rebuild
 README、仓库简介和 Release 统一遵循 [Publication style](PUBLICATION_STYLE.md)。新版本从 [Release template](RELEASE_TEMPLATE.md) 开始，更新 [当前版本说明](RELEASE_NOTES.md) 后再打包。
 
 Use the shared format for READMEs, repository descriptions and releases. Update both languages and release notes before packaging.
+
+## 版本与本地构建 / Versioning and local builds
+
+日常维护和本地交付默认使用正式 X.Y.Z 版本号。修改源码版本后，直接运行 package.ps1 -Locked；本地打包本身不会发布到 GitHub。推送同名 vX.Y.Z 标签后，由 Publish release 工作流构建、校验并发布 Portable/Lite。仓库权限与版本号独立，不因去掉预览后缀改变私有仓库权限。
+
+Use stable X.Y.Z numbers for normal maintenance and local delivery. Update the declared version, then run package.ps1 -Locked. Local packaging does not publish to GitHub; pushing the matching vX.Y.Z tag triggers verified Portable/Lite publication.

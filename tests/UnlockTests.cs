@@ -18,9 +18,9 @@ static class UnlockTests
    Check(!p.Completed&&p.Error.Length>0,"unlock fails closed: "+kind);
   }
   p=new();p.Begin(42,now);p.Observe(false,false,0,true,true,now+TimeSpan.FromSeconds(31).Ticks);p.AcknowledgeError();
-  Check(p.Pending&&p.Error.Length>0,"timeout cannot be rearmed while unknown");
+  Check(p.Pending&&p.Error.Length==0,"timeout waits without fault or repeat");
   p.Observe(true,true,42,true,false,now+TimeSpan.FromSeconds(32).Ticks);
-  Check(!p.Pending&&p.Error.Length>0&&p.UnlockedCount==1,"late success observed but timeout remains paused");
+  Check(!p.Pending&&p.Error.Length==0&&p.UnlockedCount==1,"late verified success resumes automatically");
   p.AcknowledgeError();Check(p.Error=="","resolved unlock can explicitly acknowledge");
   var command=new FishingControl{OwnerId="one",ProcessId=12,Enabled=true,AutoSell=true,UntilUtcTicks=now+TimeSpan.FromSeconds(10).Ticks,Retention=new(){KeepLocked=false}};
   var authorization=new FishingSaleAuthorization(command);

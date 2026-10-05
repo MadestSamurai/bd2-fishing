@@ -5,7 +5,8 @@ namespace BD2Fishing
     public sealed class FishingPolicy
     {
         private string owner = "", state = "";
-        private long entered, lastInput;
+        private long entered, lastInput, lastObserved;
+        private int networkRecoveries;
         private bool hookSent, castSent, released, ownsCharge;
         private int closedPopup;
         private readonly FishingMapRenewal mapRenewal = new FishingMapRenewal();
@@ -31,9 +32,20 @@ namespace BD2Fishing
                 mapRenewal.Cancel(); owner=c.OwnerId; state=""; hookSent=castSent=released=false; closedPopup=0; lastInput=0; Fault="";
             }
             if (s.State != state) {if(s.State!="Casting")ownsCharge=false;state=s.State;entered=now;hookSent=castSent=released=false;}
+            long elapsed=lastObserved==0?0:Math.Max(0,now-lastObserved);lastObserved=now;
+            if(networkRecoveries!=s.NetworkRecoveries){
+                networkRecoveries=s.NetworkRecoveries;entered=now;lastInput=now;
+                if(s.State=="None")castSent=released=hookSent=false;
+            }
+            if(s.NetworkPending){
+                entered+=elapsed;lastInput=now;mapRenewal.PauseClock(elapsed);
+                Reason=s.NetworkWaitSeconds>=30?"等待游戏网络恢复，恢复后自动继续":"等待游戏服务器响应";
+                if(Holding&&(!s.HoldActive||s.HoldCompleted||!s.HoldTracking||s.State!="Fighting"||s.NetworkWaitSeconds>=30||s.HoldTargetHit||!s.HoldInside)){Holding=false;return FishingAction.HoldRelease;}
+                return FishingAction.None;
+            }
             if (!s.ResultPopup && !s.LevelPopup) closedPopup=0;
             if (s.Error.Length>0) Fail(s.Error);
-            if (s.NetworkPending && s.NetworkWaitSeconds>30) Fail("网络响应超过 30 秒，请核对游戏提示后停止并重新开启");
+            // A transport wait is recoverable state, not a latched policy failure.
             if (!holdPhase && Fault.Length==0 && mapRenewal.Next(s,c,now,out var travel))
             {
                 if(mapRenewal.Fault.Length>0)Fail(mapRenewal.Fault);
@@ -95,21 +107,21 @@ namespace BD2Fishing
                         }
                         castSent=true;ownsCharge=true;lastInput=now;return FishingAction.CastPress;
                     }
-                    if(castSent && now-lastInput>TimeSpan.FromSeconds(5).Ticks) Fail("抛竿输入未生效，请检查游戏界面");
+                    if(castSent && now-lastInput>TimeSpan.FromSeconds(5).Ticks) Reason="等待游戏进入抛竿状态，恢复后自动继续";
                     break;
                 case "Casting":
                     Reason=s.CastRunning?"抛竿蓄力":"等待抛竿确认";
                     if(s.CastRunning && !released && s.Gauge>=c.CastGauge){released=true;ownsCharge=false;lastInput=now;return FishingAction.CastRelease;}
-                    if(now-entered>TimeSpan.FromSeconds(15).Ticks) Fail("抛竿阶段未推进，请检查网络或游戏界面");
+                    if(now-entered>TimeSpan.FromSeconds(15).Ticks) Reason="等待游戏完成抛竿，恢复后自动继续";
                     break;
                 case "WaitingForBite": Reason="等待鱼咬钩";break;
                 case "BiteDetected":
                     Reason="已咬钩，等待提竿响应";
                     if(!hookSent){hookSent=true;lastInput=now;return FishingAction.Hook;}
-                    if(now-lastInput>TimeSpan.FromSeconds(30).Ticks) Fail("提竿未返回，请检查游戏网络提示");
+                    if(now-lastInput>TimeSpan.FromSeconds(30).Ticks) Reason="等待游戏完成提竿，恢复后自动继续";
                     break;
                 case "Pause": Reason="等待下一次收线";break;
-                case "Caught": Reason="等待收获结算与弹窗";if(now-entered>TimeSpan.FromSeconds(45).Ticks)Fail("收获未完成，请核对游戏提示");break;
+                case "Caught": Reason="等待收获结算与弹窗";if(now-entered>TimeSpan.FromSeconds(45).Ticks)Reason="等待游戏完成收获结算，恢复后自动继续";break;
                 case "Auto": Reason="请先关闭游戏内自动钓鱼";break;
                 case "Fighting":
                     if(s.Freeze){Reason="解除冰冻";lastInput=now;return FishingAction.FightClick;}

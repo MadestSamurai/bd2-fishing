@@ -1,0 +1,92 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to build and publish (for example v0.4.5)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Validate requested tag
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Expected vX.Y.Z release tag' }
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check source version
+        shell: pwsh
+        run: |
+          $version=([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.Version
+          if ($env:RELEASE_TAG -ne "v$version") { throw 'Tag does not match source version' }
+      - name: Build and validate both editions
+        shell: pwsh
+        run: ./package.ps1 -Locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BD2Fishing-win-x64
+          path: dist/${{ env.RELEASE_TAG }}/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload, verify and publish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag=$env:RELEASE_TAG
+          $folder=Join-Path 'dist' $tag
+          $files=@(Get-ChildItem -LiteralPath $folder -File)
+          if ($files.Count -ne 6) { throw 'Expected two EXEs, two ZIPs, checksums and release metadata' }
+          foreach ($line in Get-Content (Join-Path $folder 'SHA256SUMS.txt')) {
+            $hash,$name=$line -split '  ',2
+            if ((Get-FileHash -LiteralPath (Join-Path $folder $name) -Algorithm SHA256).Hash -ne $hash) { throw "Checksum mismatch: $name" }
+          }
+          $existingJson=gh release view $tag --json apiUrl,isDraft 2>$null
+          $existing=if ($LASTEXITCODE -eq 0) { $existingJson | ConvertFrom-Json } else { $null }
+          $paths=@($files | ForEach-Object FullName)
+          if ($null -ne $existing) {
+            if (!$existing.isDraft) { throw 'Published assets are immutable; use a new version' }
+            gh release upload $tag @paths --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed' }
+            gh release edit $tag --title "BD2 Fishing $tag" --notes-file ("docs/release-"+$tag.Substring(1)+".md")
+            if ($LASTEXITCODE -ne 0) { throw 'Release notes update failed' }
+          } else {
+            gh release create $tag @paths --verify-tag --draft --title "BD2 Fishing $tag" --notes-file ("docs/release-"+$tag.Substring(1)+".md")
+            if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed' }
+          }
+          $view=gh release view $tag --json apiUrl | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot locate uploaded release' }
+          $release=gh api $view.apiUrl | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify uploaded release' }
+          if (@($release.assets).Count -ne $files.Count) { throw 'Uploaded asset count mismatch' }
+          foreach ($file in $files) {
+            $asset=@($release.assets | Where-Object name -eq $file.Name)
+            $digest='sha256:'+(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].size -ne $file.Length -or $asset[0].digest -ne $digest) { throw "Remote asset mismatch: $($file.Name)" }
+          }
+          gh release edit $tag --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          "Published $tag from commit $(git rev-parse HEAD). All six remote asset hashes verified." | Add-Content $env:GITHUB_STEP_SUMMARY

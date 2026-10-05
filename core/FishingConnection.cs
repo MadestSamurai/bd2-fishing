@@ -29,7 +29,7 @@ public sealed class FishingConnection
         string fingerprint=HookCompiler.ToolFingerprint+(daily?".daily":"");var path=Path.Combine(root,"connection.json");
         trace.Stage("process.found");
         FishingDiagnostics.Write(root,"process.identity",$"pid={pid}; startedUtcTicks={start}; tool64={Environment.Is64BitProcess}; os64={Environment.Is64BitOperatingSystem}");
-        var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,pid,start);
+        var pipe=BD2.LocalIpc.DesktopFiles.Connect(root,pid,start); if(BD2.LocalIpc.HostedConnection.TryOpen(pipe,pid,start))return "已使用日常助手的统一连接";
         trace.Stage("pipe.probe");
         try
         {

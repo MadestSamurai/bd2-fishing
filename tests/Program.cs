@@ -1,6 +1,6 @@
 using BD2Fishing;
 int assertions=0;void Check(bool ok,string msg){assertions++;if(!ok)throw new Exception(msg);}
-long time=DateTime.UtcNow.Ticks;
+RecoveryRegression.Run(Check);long time=DateTime.UtcNow.Ticks;
 FishingSnapshot S(string state="None")=>new(){ProcessId=123,Ready=true,State=state,CanCast=true,TimeRemaining=30};
 FishingControl C()=>new(){OwnerId="test",ProcessId=123,Enabled=true,UntilUtcTicks=time+TimeSpan.FromSeconds(10).Ticks,NextCastMilliseconds=1000};
 FishingAction Step(FishingPolicy p,FishingSnapshot s,int ms=100,bool hold=false){time+=TimeSpan.FromMilliseconds(ms).Ticks;return p.Next(s,C(),time,hold);}
@@ -19,7 +19,7 @@ s.WeakWidth=20;s.NeedleVelocity=100;s.NeedlePosition=0;s.WeakPosition=10;s.Norma
 p=new();s=S("Fighting");s.HoldActive=true;s.HoldInside=true;s.HoldStartHit=true;Check(Step(p,s,100,true)==FishingAction.HoldPress,"hold start left");s.HoldStartHit=false;s.HoldTracking=true;Check(Step(p,s,100,true)==FishingAction.None,"keep hold");s.HoldTargetHit=true;Check(Step(p,s,100,true)==FishingAction.HoldRelease,"release on correct end before game update");
 p=new();s=S("Fighting");s.HoldActive=true;s.HoldInside=true;s.HoldEndHit=true;Check(Step(p,s,100,true)==FishingAction.HoldPress,"hold start right");Check(p.Next(s,new FishingControl(),time,true)==FishingAction.HoldRelease,"disabled releases owned hold");Check(!p.Holding,"hold ownership cleared");
 p=new();s=S();Step(p,s);Step(p,s,1000);s.State="Casting";s.CastRunning=true;s.Gauge=.1;Step(p,s);Check(p.Next(s,new FishingControl(),time)==FishingAction.CastRelease,"stop releases charging owned by automation");Check(p.Next(s,new FishingControl(),time)==FishingAction.None,"stop does not repeat release");
-p=new();s=S("Fighting");s.WeakHit=true;s.NetworkPending=true;s.NetworkWaitSeconds=31;Check(Step(p,s)==FishingAction.None&&p.Fault.Length>0,"timeout latches fault");s.NetworkPending=false;Check(Step(p,s)==FishingAction.None,"fault cannot silently resume");var fresh=C();fresh.OwnerId="explicit-restart";Check(p.Next(s,fresh,time+1000000)==FishingAction.FightClick,"explicit owner may resume after resolved state");
+p=new();s=S("Fighting");s.WeakHit=true;s.NetworkPending=true;s.NetworkWaitSeconds=31;Check(Step(p,s)==FishingAction.None&&p.Fault.Length==0,"network timeout is recoverable status");s.NetworkPending=false;Check(Step(p,s)==FishingAction.FightClick,"same enabled run resumes after network recovery");var fresh=C();fresh.OwnerId="explicit-restart";Check(p.Next(s,fresh,time+1000000)==FishingAction.FightClick,"explicit owner may resume after resolved state");
 foreach(var mode in new[]{"Auto","WaitingForBite","Pause","Unavailable"}){p=new();s=S(mode);s.WeakHit=true;Check(Step(p,s)==FishingAction.None,"no inputs outside manual fight: "+mode);}
 p=new();s=S();s.BagFull=true;Step(p,s);Check(Step(p,s,2000)==FishingAction.None,"bag full blocks cast");s.BagFull=false;Check(Step(p,s)==FishingAction.CastPress,"continue after user clears bag");
 foreach(var mode in new[]{"modal","scene","unready"}){p=new();s=S("Fighting");s.WeakHit=true;if(mode=="modal")s.BlockReason="popup";if(mode=="scene")s.Busy=true;if(mode=="unready")s.Ready=false;Check(Step(p,s)==FishingAction.None,"gated "+mode);}
@@ -83,7 +83,7 @@ sale.Observe(true,true,plan.KeepIds,time);Check(sale.SoldCount==2,"duplicate rep
 sale=new();sale.Begin(plan,time);sale.Observe(true,true,bag.Select(f=>f.InvenIndex),time);Check(sale.SoldCount==0 && sale.Error.Length>0,"successful response with unchanged bag pauses");
 sale=new();sale.Begin(plan,time);sale.Observe(true,true,plan.KeepIds.Where(id=>id!=3),time);Check(sale.SoldCount==0 && sale.Error.Length>0,"missing protected fish is detected");
 sale=new();sale.Begin(plan,time);sale.Observe(true,false,bag.Select(f=>f.InvenIndex),time);Check(!sale.Pending && sale.Error.Length>0 && sale.SoldCount==0,"failed response is not sold");
-sale=new();sale.Begin(plan,time);sale.Observe(false,false,plan.KeepIds,time+TimeSpan.FromSeconds(31).Ticks);sale.AcknowledgeError();Check(sale.Pending && sale.Error.Length>0,"uncertain timeout remains in flight after acknowledge");
+sale=new();sale.Begin(plan,time);sale.Observe(false,false,plan.KeepIds,time+TimeSpan.FromSeconds(31).Ticks);sale.AcknowledgeError();Check(sale.Pending && sale.Error.Length==0,"uncertain timeout remains pending without latching fault");
 sale.Observe(true,true,plan.KeepIds,time+TimeSpan.FromSeconds(32).Ticks);Check(!sale.Pending && sale.SoldCount==2,"late receipt resolved without duplicate send");
 var changed=FishingSalePlan.Build(new[]{Fish(100)});changed.Items[0].IsLocked=true;throws=false;try{new FishingSaleProgress().Begin(changed,time);}catch(InvalidOperationException){throws=true;}Check(throws,"last moment lock change rejected");
 var auto=C();auto.AutoSell=true;p=new();s=S();s.BagFull=true;s.SaleReady=true;s.SellableCount=20;
@@ -129,8 +129,8 @@ foreach(var variant in new[]{"unchanged","overconsumed","no-buff","failed","inva
 bait=new();bait.Begin(1,3,101,time);bait.Observe(true,true,false,2,true,time);Check(bait.Pending,"wait for readable scene even with successful bait callback");
 bait.Observe(true,true,true,2,true,time);Check(!bait.Pending && bait.UsedCount==1,"scene return resolves bait without resending");
 bait=new();bait.Begin(1,3,101,time);bait.Observe(false,false,false,0,false,time+TimeSpan.FromSeconds(31).Ticks);bait.AcknowledgeError();
-Check(bait.Pending && bait.Error.Length>0,"uncertain bait timeout cannot rearm");bait.Observe(true,true,true,2,true,time+TimeSpan.FromSeconds(32).Ticks);
-Check(!bait.Pending && bait.UsedCount==1 && bait.Error.Length>0,"late success counted but pause remains until explicit restart");bait.AcknowledgeError();Check(bait.Error=="","resolved timeout can acknowledge");
+Check(bait.Pending && bait.Error.Length==0,"uncertain bait timeout waits without rearming or latching fault");bait.Observe(true,true,true,2,true,time+TimeSpan.FromSeconds(32).Ticks);
+Check(!bait.Pending && bait.UsedCount==1 && bait.Error.Length==0,"late verified success automatically resumes");bait.AcknowledgeError();Check(bait.Error=="","resolved timeout can acknowledge");
 foreach(var values in new[]{(0L,1,1),(1L,0,1),(1L,1,0)})
 {throws=false;try{new FishingBaitProgress().Begin(values.Item1,values.Item2,values.Item3,time);}catch(InvalidOperationException){throws=true;}Check(throws,"invalid bait request rejected");}
 FishingControl B(){var cc=C();cc.AutoBait=true;cc.NextCastMilliseconds=0;return cc;}
@@ -273,4 +273,6 @@ InventoryRegression.Run(Check);
 assertions+=RetentionTests.Run();
 assertions+=UnlockTests.Run();
 assertions+=LocalizationTests.Run();
+assertions+=PreferenceWriteTests.Run();
 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new{status="pass",assertions,gameRequests=0,injection=false}));
+

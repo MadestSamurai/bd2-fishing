@@ -5,7 +5,17 @@ public static class FishingJson
  public static T? Read<T>(string path) where T:class
  {try{if(BD2.LocalIpc.DesktopFiles.Read(path,out var live))return live==null?null:JsonSerializer.Deserialize<T>(live);using var s=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);return JsonSerializer.Deserialize<T>(s);}catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException or TimeoutException or ObjectDisposedException){if(BD2.LocalIpc.DesktopFiles.Handles(path))FishingDiagnostics.Throttled(Path.GetDirectoryName(path)!,"read."+Path.GetFileName(path),e);return null;}}
  public static void Write<T>(string path,T value)
- {if(BD2.LocalIpc.DesktopFiles.Write(path,JsonSerializer.SerializeToUtf8Bytes(value)))return;var dir=Path.GetDirectoryName(path)!;Directory.CreateDirectory(dir);var tmp=Path.Combine(dir,Guid.NewGuid().ToString("N")+".tmp");try{File.WriteAllText(tmp,JsonSerializer.Serialize(value));File.Move(tmp,path,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}}
+ {if(BD2.LocalIpc.DesktopFiles.Write(path,JsonSerializer.SerializeToUtf8Bytes(value)))return;var dir=Path.GetDirectoryName(path)!;Directory.CreateDirectory(dir);var tmp=Path.Combine(dir,Guid.NewGuid().ToString("N")+".tmp");try{File.WriteAllText(tmp,JsonSerializer.Serialize(value));
+ var elapsed=System.Diagnostics.Stopwatch.StartNew();
+ while(true){
+  try{File.Move(tmp,path,true);break;}
+  catch(Exception error)when(error is IOException or UnauthorizedAccessException){
+   int code=error.HResult&0xffff;
+   // Only retry the atomic local-file replacement, never a pipe write or game request.
+   if(code is not (5 or 32 or 33) || elapsed.ElapsedMilliseconds>=300 || (File.Exists(path)&&(File.GetAttributes(path)&FileAttributes.ReadOnly)!=0))throw;
+   Thread.Sleep(10);
+  }
+ }}finally{if(File.Exists(tmp))File.Delete(tmp);}}
 }
 public sealed class FishingSettings
 {
@@ -74,3 +84,4 @@ public sealed class FishingControlLink:IDisposable
  public void Dispose(){lock(sync){if(disposed)return;disposed=true;command.Enabled=false;stopVersion++;revision++;}timer.Dispose();try{Publish();}catch(Exception e){lock(sync)error=e.Message;FishingDiagnostics.Throttled(root,"close.stop",e);}}
  public static bool Fresh(FishingSnapshot? s,DateTime now)=>s!=null && s.Schema==1 && s.Runtime==FishingIdentity.RuntimeName && s.ProcessId>0 && s.CapturedUtcTicks<=now.AddSeconds(2).Ticks && s.CapturedUtcTicks>=now.AddSeconds(-3).Ticks;
 }
+

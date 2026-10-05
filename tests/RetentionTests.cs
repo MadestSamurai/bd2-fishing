@@ -32,13 +32,13 @@ internal static class RetentionTests
         tied[2].IsLocked=false;tied[2].WasLocked=true;
         Check(Sold(tied,Rule(FishingSizeMode.Both)).SequenceEqual(new long[]{2,3}),"our unlock preserves category and tie identity");
         var overlap=new[]{Fish(1,size:10,locked:true),Fish(2,size:20),Fish(3,size:30,grade:1,locked:true),Fish(4,size:40,grade:1)};
-        Check(Sold(overlap,Rule(FishingSizeMode.Maximum)).SequenceEqual(new long[]{1,4}),"separate category extrema union");
+        Check(Sold(overlap,Rule(FishingSizeMode.Maximum)).SequenceEqual(new long[]{1}),"whole species and extra category extrema union");
         var onlyLegend=Rule(FishingSizeMode.Maximum);onlyLegend.SizeLocked=false;
-        Check(Sold(overlap,onlyLegend).SequenceEqual(new long[]{1,3,4}),"legendary size scope independent");
+        Check(Sold(overlap,onlyLegend).SequenceEqual(new long[]{1,3}),"legendary size records add to whole species");
         var onlyLocked=Rule(FishingSizeMode.Maximum);onlyLocked.SizeLegendary=false;
-        Check(Sold(overlap,onlyLocked).SequenceEqual(new long[]{1,2,4}),"locked size scope independent");
+        Check(Sold(overlap,onlyLocked).SequenceEqual(new long[]{1,2}),"locked size records add to whole species");
         var neither=Rule(FishingSizeMode.Maximum);neither.SizeLegendary=false;neither.SizeLocked=false;
-        Check(Sold(overlap,neither).Length==4,"disabled size scopes select all");
+        Check(Sold(overlap,neither).SequenceEqual(new long[]{1,2,3}),"category options never disable whole-species records");
         var unknownSize=new[]{Fish(1,size:0),Fish(2,size:20),Fish(3,grade:1),Fish(4,species:2)};
         var permissiveRule=Rule(FishingSizeMode.Maximum);permissiveRule.KeepUnknown=false;
         Check(Sold(unknownSize,permissiveRule).SequenceEqual(new long[]{4}),"unknown size preserves affected whole species");
@@ -48,11 +48,12 @@ internal static class RetentionTests
         {
             var uncertain=Rule(mode);uncertain.KeepUnknown=false;
             var sample=hasKnown?unknownGrade:unknownGrade.Where(f=>f.Grade!=4).ToArray();
-            Check(Sold(sample,uncertain).SequenceEqual(new long[]{3}),"uncertain legendary size membership protects every mode with or without known legendary");
+            var expectedSales=hasKnown || mode==FishingSizeMode.Maximum?new long[]{3}:Array.Empty<long>();
+            Check(Sold(sample,uncertain).SequenceEqual(expectedSales),"unknown category protection unions with ordinary whole-species records in every mode");
             Check(!FishingSalePlan.CanSell(sample[0],uncertain),"final guard rejects uncertain legendary extrema membership");
         }
         var noLegendScope=permissiveRule.Clone();noLegendScope.SizeLegendary=false;
-        Check(Sold(unknownGrade,noLegendScope).SequenceEqual(new long[]{1,2,3}),"unknown grade may sell when no uncertain category protection applies");
+        Check(Sold(unknownGrade,noLegendScope).SequenceEqual(new long[]{2,3}),"unknown grade can be an overall size record without a category scope");
         var bad=Fish(1);bad.HasSaleEntry=false;var noTable=Fish(2);noTable.HasFishTable=false;var badSpecies=Fish(3,species:0);
         Check(Sold(new[]{bad,noTable,badSpecies},Open()).Length==0,"hard metadata exclusions cannot opt out");
         Throws<InvalidOperationException>(()=>FishingSalePlan.Build(new[]{Fish(1),Fish(1)},Open()),"duplicate ID fails closed");

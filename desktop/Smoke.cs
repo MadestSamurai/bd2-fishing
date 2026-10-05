@@ -87,7 +87,16 @@ public partial class FishingWindow
   s.MapChangePending=true;s.Reason="确认收获；昼夜切换排队，先完成本竿";s.CapturedUtcTicks=DateTime.UtcNow.Ticks;TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && ReasonText.Text.Contains("昼夜切换排队"),"queued day/night keeps automation and explains settlement");
   s.MapChangePending=false;s.Busy=true;s.State="None";s.Reason="等待场景切换";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && StopButton.IsEnabled,"scene loading keeps lease and stop available");
   s.Busy=false;s.Reason="准备下一竿";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(link.Enabled && ReasonText.Text=="准备下一竿","scene completion shows automatic continuation");
-  s.OwnerId=link.OwnerId;s.Error="网络响应超过 30 秒";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();Check(!link.Enabled,"network error stops automation");await controlQueue;
+  s.OwnerId=link.OwnerId;s.NetworkPending=true;s.NetworkWaitSeconds=360;s.Reason="等待游戏网络恢复，恢复后自动继续";s.CapturedUtcTicks=DateTime.UtcNow.Ticks;
+  TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();
+  Check(link.Enabled&&StopButton.IsEnabled&&ReasonText.Text.Contains("自动继续"),"six-minute network wait keeps run and Stop available");
+  await StopAsync();await controlQueue;s.Enabled=false;TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();
+  Check(!link.Enabled&&StartButton.IsEnabled,"can restart while network recovery is still pending");
+  await StartAsync();s.OwnerId=link.OwnerId;Check(link.Enabled,"restart does not require replacing the game process");
+  s.NetworkPending=false;s.NetworkWaitSeconds=0;s.Reason="准备下一竿";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();
+  Check(link.Enabled&&StopButton.IsEnabled&&ReasonText.Text=="准备下一竿","network recovery automatically returns to normal running");
+  s.Error="出售后保护鱼缺失";TestTransport.Publish(Path.Combine(root,"latest.json"),s);await RefreshAsync();await controlQueue;
+  Check(!link.Enabled,"authoritative inventory mismatch still stops consuming actions");
   await controlQueue;Close();await shutdownTask;c=FishingJson.Read<FishingControl>(Path.Combine(root,"control.json"))!;Check(!c.Enabled&&c.UntilUtcTicks==0,"close revokes lease");
   FishingJson.Write(Path.Combine(evidence,"results.json"),new{status="pass",assertions=checks});
   void Capture(string name){var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(evidence,name));png.Save(file);}

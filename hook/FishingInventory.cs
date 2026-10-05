@@ -23,6 +23,7 @@ namespace BD2Fishing.Runtime
         internal FishingInventory(Action<string> log){this.log=log;}
         internal static MethodInfo SaleMethod()=>(MethodInfo)FishingBindings.Api("Inventory.Sell");
         private static List<FishingFishDBInfo> Bag() => ((System.Collections.IEnumerable)FishingBindings.Invoke("Inventory.FishList"))?.Cast<FishingFishDBInfo>().ToList();
+        internal bool NeedsRefresh(long now)=>progress.NeedsRefresh(now)||unlock.NeedsRefresh(now);
         internal void AcknowledgeError(){progress.AcknowledgeError();unlock.AcknowledgeError();}
         private void Refresh(long now,FishingRetentionOptions options)
         {
@@ -51,7 +52,16 @@ namespace BD2Fishing.Runtime
         internal void Fill(FishingSnapshot s,long now,FishingControl control)
         {
             var options=control.Retention??new FishingRetentionOptions();
-            if(authorization!=null && (!authorization.Valid(control,now,s.ProcessId) || !s.Ready || s.Busy || s.MapChangePending || s.MapTravelBusy))
+            if(s.Ready&&s.NetworkIdle&&s.InventoryRefreshTicks>0)
+            {
+                bool saleRecovered=progress.Reconcile(s.InventoryRefreshTicks,true);
+                bool unlockRecovered=unlock.Reconcile(s.InventoryRefreshTicks,true);
+                if(saleRecovered||unlockRecovered){
+                    log("inventory_reconciled snapshot="+s.InventoryRefreshTicks+" sale="+saleRecovered+" unlock="+unlockRecovered+"; no assumed success");
+                    batch=null;authorization=null;operationStatus="已同步当前鱼背包，继续按保留规则处理";lastRead=0;
+                }
+            }
+            if(authorization!=null && !authorization.Valid(control,now,s.ProcessId))
             {
                 batch=null;operationStatus="已取消后续出售；已确认解锁 "+unlock.UnlockedCount+" 条，锁定状态不会自动还原";
                 cancelledOwner=authorization.OwnerId;authorization=null;
@@ -71,19 +81,20 @@ namespace BD2Fishing.Runtime
                 if(reply)lastRead=0;
             }
             s.SalePending=progress.Pending || unlock.Pending;s.SoldCount=progress.SoldCount;s.UnlockedCount=unlock.UnlockedCount;
-            if(unlock.Error.Length>0)s.Error=unlock.Error;
-            if(progress.Error.Length>0)s.Error=progress.Error;
+            if(unlock.Error.Length>0&&!unlock.Pending)s.Error=unlock.Error;
+            if(progress.Error.Length>0&&!progress.Pending)s.Error=progress.Error;
             if(control.Enabled && control.OwnerId==cancelledOwner)s.Error=operationStatus+"；请重新开始钓鱼";
             if(s.Ready)
             {
                 var bag=Bag();
                 s.BagCount=bag?.Count??0;
                 s.BagCapacity=(int)FishingBindings.Num(FishingBindings.Read("Player.Data",null),"FishingFishInvenSlot");
-                if(!s.SalePending && s.State=="None" && ((plan!=null && plan.Options.Fingerprint()!=options.Fingerprint()) || now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks))Refresh(now,options);
+                // Read-only counts must refresh during casting/reeling too. Sell() retains its idle gate.
+                if(!s.SalePending && ((plan!=null && plan.Options.Fingerprint()!=options.Fingerprint()) || now-lastRead>=TimeSpan.FromMilliseconds(500).Ticks))Refresh(now,options);
                 s.SaleReady=plan!=null && problem.Length==0;s.SellableCount=plan?.Sellable??0;s.ProtectedFishCount=plan?.Protected??0;s.FishSpecies=species;
                 // A full bag starts one cleanup cycle. Free space after a confirmed batch must
                 // not end it; finish only after a fresh whole-bag plan has no eligible fish.
-                if(authorization!=null && !s.SalePending && s.SaleReady && s.State=="None" && s.Error.Length==0)
+                if(authorization!=null && !s.SalePending && s.SaleReady && s.State=="None" && !s.Busy && !s.MapTravelBusy && !s.MapChangePending && s.Error.Length==0)
                 {
                     operationStatus="本轮已确认出售 "+(progress.SoldCount-cycleStartSold)+" 条，剩余可售 "+s.SellableCount+" 条";
                     if(s.SellableCount==0){authorization=null;batch=null;operationStatus="本轮已确认出售 "+(progress.SoldCount-cycleStartSold)+" 条，整理完成";}

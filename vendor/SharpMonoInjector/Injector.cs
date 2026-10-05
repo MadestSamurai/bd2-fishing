@@ -64,6 +64,7 @@ namespace SharpMonoInjector
 
         public Injector(string processName)
         {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BD2_DAILY_HOSTED_TOOL"))) throw new InvalidOperationException("Connection is managed by the daily host; return to the host to reconnect.");
             Process process = Process.GetProcesses()
                 .FirstOrDefault(p => p.ProcessName
                 .Equals(processName, StringComparison.OrdinalIgnoreCase));
@@ -84,6 +85,7 @@ namespace SharpMonoInjector
 
         public Injector(int processId)
         {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BD2_DAILY_HOSTED_TOOL"))) throw new InvalidOperationException("Connection is managed by the daily host; return to the host to reconnect.");
             Process process = Process.GetProcesses()
                 .FirstOrDefault(p => p.Id == processId);
 
@@ -103,6 +105,7 @@ namespace SharpMonoInjector
 
         public Injector(IntPtr processHandle, IntPtr monoModule)
         {
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BD2_DAILY_HOSTED_TOOL"))) throw new InvalidOperationException("Connection is managed by the daily host; return to the host to reconnect.");
             if ((_handle = processHandle) == IntPtr.Zero)
                 throw new ArgumentException("Argument cannot be zero", nameof(processHandle));
 

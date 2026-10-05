@@ -1,8 +1,12 @@
-param([string]$Version='', [switch]$Locked)
+param([string]$Version='', [switch]$Locked, [switch]$Candidate)
 $ErrorActionPreference='Stop'
 $declared=([xml](Get-Content (Join-Path $PSScriptRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if(!$Version){$Version=$declared}
-if($Version -notmatch '^\d+\.\d+\.\d+$' -or $Version -ne $declared){throw 'Release version must match Directory.Build.props'}
+if($Candidate){
+    if($Version -notmatch '^\d+\.\d+\.\d+-preview\.\d+$' -or [version]($Version.Split('-')[0]) -lt [version]$declared){throw 'Candidate requires an explicit current-or-newer X.Y.Z-preview.N version'}
+}else{
+    if($Version -notmatch '^\d+\.\d+\.\d+$' -or $Version -ne $declared){throw 'Release version must match Directory.Build.props'}
+}
 & (Join-Path $PSScriptRoot 'build.ps1') -Locked:$Locked
 $destination=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot "dist/v$Version"))
 if(Test-Path -LiteralPath $destination){throw 'Release assets already exist; use a fresh checkout'}
@@ -28,6 +32,7 @@ foreach($flavor in @('Portable','Lite')){
     $identityPath=Join-Path $check 'identity.json'
     RunCheck @('--identity',('"'+$identityPath+'"'))
     $identity=Get-Content $identityPath -Raw | ConvertFrom-Json
+    if($identity.displayVersion -ne $Version){throw 'Packaged display version differs'}
     if($identity.runtime -ne 'BD2Fishing.Runtime11' -or $identity.compatibility -ne 'local-interface-adaptation' -or $identity.defaultNextCastMs -ne 1000){throw 'Embedded identity differs from release'}
     RunCheck @('--smoke',('"'+$check+'"'))
     $ui=Get-Content (Join-Path $check 'results.json') -Raw | ConvertFrom-Json
@@ -48,6 +53,15 @@ foreach($flavor in @('Portable','Lite')){
     Copy-Item -LiteralPath $exe -Destination $exePath
     Copy-Item -LiteralPath $exe -Destination (Join-Path $bundle "$name.exe")
     foreach($file in @('README.md','README.en.md','DISTRIBUTION.md','LICENSE','THIRD_PARTY_NOTICES.md')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $bundle}
+    if($Candidate){
+        $note="# BD2 Fishing $Version`n`n本地测试候选，尚未发布到GitHub。候选变更见随包的docs/CANDIDATE_NOTES.md。`n`nLocal test candidate, not a GitHub release. See docs/CANDIDATE_NOTES.md for changes.`n"
+        Set-Content -LiteralPath (Join-Path $bundle 'CANDIDATE.md') -Value $note -Encoding utf8
+        foreach($readme in @('README.md','README.en.md')){
+            $path=Join-Path $bundle $readme
+            $body=Get-Content -LiteralPath $path -Raw
+            Set-Content -LiteralPath $path -Value ($note+"`n---`n`n"+$body) -Encoding utf8
+        }
+    }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses') -Destination $bundle -Recurse
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docs') -Destination $bundle -Recurse
     Compress-Archive -LiteralPath $bundle -DestinationPath $zipPath -CompressionLevel Optimal
@@ -56,7 +70,7 @@ foreach($flavor in @('Portable','Lite')){
 }
 if($flavors[1].exeBytes -ge $flavors[0].exeBytes){throw 'Lite must be smaller than Portable'}
 @(foreach($file in $assets){"$((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($file))"}) | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
-[ordered]@{version=$Version;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;languages=@('zh-CN','en-US');gameLibrariesBundled=$false;clientVersionLock=$false} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
+[ordered]@{version=$Version;candidate=$Candidate.IsPresent;runtime=$identity.runtime;compatibility=$identity.compatibility;flavors=$flavors;languages=@('zh-CN','en-US');gameLibrariesBundled=$false;clientVersionLock=$false} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 $repoRoot=[IO.Path]::GetFullPath($PSScriptRoot)+[IO.Path]::DirectorySeparatorChar
 if(!([IO.Path]::GetFullPath($output)).StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase) -or !$destination.StartsWith($repoRoot,[StringComparison]::OrdinalIgnoreCase)){throw 'Output paths outside repository'}
 New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null

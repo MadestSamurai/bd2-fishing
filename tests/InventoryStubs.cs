@@ -8,12 +8,12 @@ namespace BD2Fishing.Runtime {
  internal sealed class InventoryHost {
   public List<Proto.Net.FishingFishDBInfo> Fish=new();
   public int FishingFishInvenSlot {get;set;}=400;
-  public List<long[]> Sales=new();public List<long> Unlocks=new();public bool MissingTable;
+  public List<long[]> Sales=new();public List<long> Unlocks=new();public bool MissingTable;public int FishGrade=4;
   public object? Invoke(string api,object?[] args)=>api switch {
    "Inventory.FishList"=>Fish,
    "Tables.Shop"=>new {ShopItemId=1},
    "Tables.ShopEntries"=>Fish.Select(f=>f.Id).Distinct().Select(id=>new {GroupId=1,ItemType=1,ItemId=id,PriceCount=1}).ToArray(),
-   "Tables.Fish"=>MissingTable?null:new {Id=(int)args[0]!,Grade=4,NameTextId=(int)args[0]!},
+   "Tables.Fish"=>MissingTable?null:new {Id=(int)args[0]!,Grade=FishGrade,NameTextId=(int)args[0]!},
    "Text.FishName"=>"fish-"+args[0],
    "Inventory.Sell"=>Sell((IList)args[1]!),
    "Inventory.Unlock"=>Unlock((long)args[0]!),
