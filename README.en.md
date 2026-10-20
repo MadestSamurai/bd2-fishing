@@ -1,3 +1,6 @@
+> **Moved to Dustweave — standalone maintenance has ended.**
+> Source and UI are maintained in [Dustweave / Fishing](https://github.com/MadestSamurai/Dustweave/tree/main/src/Fishing). Download the [latest Dustweave release](https://github.com/MadestSamurai/Dustweave/releases/latest) and report issues in [Dustweave Issues](https://github.com/MadestSamurai/Dustweave/issues). The original documentation below is preserved for reference.
+
 # BD2 Fishing
 
 > **Free & open source:** Official releases are provided free by GitHub **MadestSamurai** · Bilibili **MadSamurai**. [Official downloads](https://github.com/MadestSamurai/bd2-fishing/releases) · [Source and risk notice](DISTRIBUTION.md#english). Third-party fees do not imply the author’s involvement, endorsement or support.
